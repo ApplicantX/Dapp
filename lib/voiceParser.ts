@@ -32,7 +32,7 @@ export function parseSpokenNumber(text: string): number | null {
       if (clean.includes('thousand') || clean.includes('હજાર') || clean.includes('हज़ार')) {
         return val < 1000 ? val * 1000 : val;
       }
-      if (clean.includes('lakh') || clean.includes('લાખ') || clean.includes('લાખ')) {
+      if (clean.includes('lakh') || clean.includes('લાખ') || clean.includes('लाख')) {
         return val < 100000 ? val * 100000 : val;
       }
       return val;
@@ -44,13 +44,13 @@ export function parseSpokenNumber(text: string): number | null {
 
 // 1. Single Customer Voice Parsing
 export function parseSingleCustomerVoice(rawText: string, knownVillages: string[] = []): ParsedCustomerVoice {
-  // Strip out common noise phrases
   let text = rawText
     .replace(/thank you for watching\.?/gi, '')
     .replace(/thanks for watching\.?/gi, '')
     .replace(/thank you\.?/gi, '')
     .replace(/thanks\.?/gi, '')
     .replace(/please subscribe\.?/gi, '')
+    .replace(/tola,?\s*diary\s*page\.?/gi, '')
     .trim();
 
   const lower = text.toLowerCase();
@@ -61,13 +61,13 @@ export function parseSingleCustomerVoice(rawText: string, knownVillages: string[
   let pageNumber = '';
   let mobile: string | undefined = undefined;
 
-  // Extract Mobile number
+  // 1. Extract Mobile number (10 digits)
   const mobileMatch = text.match(/(?:\+91|0)?[6-9]\d{9}/);
   if (mobileMatch) {
     mobile = mobileMatch[0];
   }
 
-  // Extract Diary (ONLY if explicitly mentioned in speech!)
+  // 2. Extract Diary Reference (ONLY if explicitly mentioned)
   const diaryMatch = text.match(/(?:diary|ચોપડો|ડાયરી|book)\s*([A-Za-z0-9\-_]+(?:\s+[A-Za-z0-9]+)?)/i);
   if (diaryMatch) {
     const dVal = diaryMatch[1].trim();
@@ -79,24 +79,24 @@ export function parseSingleCustomerVoice(rawText: string, knownVillages: string[
     }
   }
 
-  // Extract Page Number (ONLY if explicitly mentioned!)
+  // 3. Extract Page Number (ONLY if explicitly mentioned)
   const pageMatch = text.match(/(?:page|page number|p\.|પાના નંબર|પાનું|પેજ|પાનુ|પાન|પન્ના|पृष्ठ)\s*(?:no\.?|number)?\s*(\d+)/i);
   if (pageMatch) {
     pageNumber = pageMatch[1];
   }
 
-  // Extract Village
+  // 4. Extract Village
   const villagePatterns = [
-    /(?:from|resident of|village|at|ગામ|રહેવાસી|વાળા|ગાંવ)\s+([A-Za-z\u0A80-\u0AFF\u0900-\u097F]+(?:\s+[A-Za-z\u0A80-\u0AFF\u0900-\u097F]+)?)/i,
-    /([A-Za-z\u0A80-\u0AFF\u0900-\u097F]+)\s+(?:village|gaam|ગામ|ગાંવ)/i,
+    /(?:from|resident of|village|at|ગામ|વાળા)\s+([A-Za-z\u0A80-\u0AFF\u0900-\u097F]+(?:\s+[A-Za-z\u0A80-\u0AFF\u0900-\u097F]+)?)/i,
+    /([A-Za-z\u0A80-\u0AFF\u0900-\u097F]+)\s+(?:village|gaam|ગામ)/i,
   ];
 
   for (const pat of villagePatterns) {
     const vMatch = text.match(pat);
     if (vMatch && vMatch[1]) {
       const candidate = vMatch[1].trim();
-      const ignoredWords = ['diary', 'page', 'mobile', 'phone', 'customer', 'new', 'add', 'no', 'number', 'loan', 'rupees', 'gold', 'silver', 'thank', 'you'];
-      if (!ignoredWords.includes(candidate.toLowerCase())) {
+      const ignored = ['diary', 'page', 'mobile', 'phone', 'customer', 'new', 'add', 'no', 'number', 'loan', 'rupees', 'gold', 'silver', 'thank', 'you'];
+      if (!ignored.includes(candidate.toLowerCase())) {
         village = candidate.charAt(0).toUpperCase() + candidate.slice(1);
         break;
       }
@@ -112,32 +112,33 @@ export function parseSingleCustomerVoice(rawText: string, knownVillages: string[
     }
   }
 
-  // Extract Customer Name
-  let nameText = text;
+  // 5. Extract Customer Name
+  let cleanForName = text;
   if (village) {
-    const vIdx = nameText.toLowerCase().indexOf(village.toLowerCase());
-    if (vIdx > 0) {
-      nameText = nameText.substring(0, vIdx);
-    }
+    cleanForName = cleanForName.replace(new RegExp(`(?:from|village|at|ગામ)?\s*${village}`, 'gi'), '');
   }
-  const markers = ['from', 'village', 'diary', 'page', 'mobile', 'ગામ', 'ચોપડો', 'પાના', 'ડાયરી', 'loan', 'rupees', 'રૂપિયા', 'gold', 'silver', 'સોનું', 'ચાંદી'];
-  for (const m of markers) {
-    const mIdx = nameText.toLowerCase().indexOf(m);
-    if (mIdx > 0) {
-      nameText = nameText.substring(0, mIdx);
-    }
+  if (diary) {
+    cleanForName = cleanForName.replace(new RegExp(diary, 'gi'), '');
+  }
+  if (pageNumber) {
+    cleanForName = cleanForName.replace(new RegExp(`(?:page|p\.|પાના નંબર|પાનું)?\s*${pageNumber}`, 'gi'), '');
+  }
+  if (mobile) {
+    cleanForName = cleanForName.replace(mobile, '');
   }
 
-  name = nameText
-    .replace(/(?:customer|new customer|add customer|name is|શ્રી|નામ|\b\d+[\.\)]|\bno\.?\s*\d+|thank you|thanks)/gi, '')
+  cleanForName = cleanForName
+    .replace(/\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:lakh|thousand|k|lac|rupees|rs|રૂપિયા|loan|amount)\b/gi, '')
+    .replace(/\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:gram|grams|gm|gms|g|tola|tole|ગ્રામ|તોલા)\b/gi, '')
+    .replace(/\b\d+\b/g, '')
+    .replace(/\b(?:gold|silver|sona|chandi|kandora|kada|chain|ring|necklace|mangalsutra|earrings|bangle|anklet|payal|utensils|coin|સોનું|ચાંદી|કંદોરો|કડા|ચેઇન|વીંટી|હાર|મંગળસૂત્ર)\b/gi, '')
+    .replace(/(?:customer|new customer|add customer|name is|શ્રી|નામ|\bno\.?\s*\d+|thank you|thanks|from|village|diary|page|loan|rupees|રૂપિયા)/gi, '')
     .replace(/[^A-Za-z\u0A80-\u0AFF\u0900-\u097F\s]/g, '')
     .trim();
 
-  if (name) {
-    name = name
-      .split(/\s+/)
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(' ');
+  const nameWords = cleanForName.split(/\s+/).filter((w) => w.length > 1);
+  if (nameWords.length > 0) {
+    name = nameWords.map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
   }
 
   return {
@@ -156,6 +157,7 @@ export function parseBulkCustomersVoice(rawText: string, knownVillages: string[]
     .replace(/thank you for watching\.?/gi, '')
     .replace(/thank you\.?/gi, '')
     .replace(/thanks\.?/gi, '')
+    .replace(/tola,?\s*diary\s*page\.?/gi, '')
     .trim();
 
   if (!text) return [];
@@ -181,24 +183,23 @@ export function parseBulkCustomersVoice(rawText: string, knownVillages: string[]
     .filter((c) => c.name.length > 0);
 }
 
-// 3. High-Throughput Bulk Voice to Excel Parser (ONLY extracts what was actually spoken!)
+// 3. High-Throughput Bulk Voice to Excel Parser
 export function parseBulkVoiceToExcelRecords(
   rawText: string,
   knownVillages: string[] = [],
   knownCategories: string[] = []
 ): BulkCustomerLoanRecord[] {
-  // Strip out noise and hallucinations
   const cleanSource = rawText
     .replace(/thank you for watching\.?/gi, '')
     .replace(/thanks for watching\.?/gi, '')
     .replace(/thank you\.?/gi, '')
     .replace(/thanks\.?/gi, '')
     .replace(/please subscribe\.?/gi, '')
+    .replace(/tola,?\s*diary\s*page\.?/gi, '')
     .trim();
 
   if (!cleanSource || cleanSource.length < 2) return [];
 
-  // Split by numbers ("1.", "2."), commas between names, semicolons, newlines, "next", "and"
   const splitPattern = /(?:\b\d+[\.\)]|\bCustomer\s*\d+:?|\bનંબર\s*\d+:?|\bnumber\s*\d+:?|\bnext\s*customer:?|\bnext:|\band\s+next:?|\bપછી:?|\bબીજો\s*ગ્રાહક:?)/i;
   
   let rawSegments = cleanSource.split(splitPattern);
@@ -261,19 +262,14 @@ export function parseBulkVoiceToExcelRecords(
   validSegments.forEach((seg, index) => {
     const sLower = seg.toLowerCase();
 
-    // 1. Customer Details
+    // 1. Customer Details (Extracted cleanly)
     const cust = parseSingleCustomerVoice(seg, knownVillages);
-
-    // If no name could be found, skip empty/hallucinated segments
-    if (!cust.name && !sLower.includes('gram') && !sLower.includes('rupees') && !sLower.includes('loan')) {
-      return;
-    }
 
     // 2. Loan Amount (ONLY if spoken!)
     let loanAmount = 0;
     const amountMatches = [
       /(?:loan amount|total loan|loan of|amount of|loan|રૂપિયા|રકમ|rs\.?)\s*(?:is|of|for)?\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:lakh|thousand|k|lac|rupees|rs|રૂપિયા)?/i,
-      /(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:lakh|lac|thousand|k|rupees|rs|રૂપિયા)\s*(?:loan|total|amount)/i,
+      /(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:lakh|lac|thousand|k|rupees|rs|રૂપિયા)\s*(?:loan|total|amount)?/i,
       /(?:fifty|forty|thirty|twenty|ten|sixty|seventy|eighty|ninety|hundred|thousand|lakh|પચાસ|સાઠ|લાખ|હજાર)\s*(?:thousand|lakh|rupees|rs|રૂપિયા)?/i,
     ];
 
@@ -325,7 +321,10 @@ export function parseBulkVoiceToExcelRecords(
       }
     }
 
-    // Status Validation
+    if (!cust.name && !loanAmount && !weight && !category) {
+      return;
+    }
+
     let status: 'VALID' | 'WARNING' = 'VALID';
     let warningMessage = '';
 
@@ -343,7 +342,7 @@ export function parseBulkVoiceToExcelRecords(
       mobile: cust.mobile || undefined,
       loanAmount: loanAmount || 0,
       metal: (metalSpecified || weight > 0) ? metal : ('Silver' as MetalType),
-      category: category || (weight > 0 ? (metal === 'Gold' ? 'Chain' : 'Kandora') : ''),
+      category: category || '',
       weight: weight || 0,
       quantity: quantity || 0,
       rawSpeech: seg,
