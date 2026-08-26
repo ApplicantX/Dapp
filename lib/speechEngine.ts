@@ -1,49 +1,39 @@
 'use client';
 
-export interface ContinuousSpeechCallbacks {
-  onInterimResult?: (transcript: string) => void;
-  onFinalResult?: (transcript: string) => void;
-  onError?: (error: string) => void;
+export interface CustomAudioCallbacks {
   onStart?: () => void;
   onEnd?: () => void;
+  onInterimResult?: (text: string) => void;
+  onFinalResult?: (text: string) => void;
+  onError?: (error: string) => void;
   onAudioLevel?: (level: number) => void;
 }
 
-export class ContinuousSpeechEngine {
-  private recognition: any = null;
-  private isExplicitlyRecording: boolean = false;
-  private currentFullTranscript: string = '';
+export class CustomDirectAudioEngine {
+  private mediaRecorder: MediaRecorder | null = null;
+  private audioChunks: Blob[] = [];
   private audioContext: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
+  private source: MediaStreamAudioSourceNode | null = null;
   private stream: MediaStream | null = null;
   private animFrameId: number | null = null;
-  private callbacks: ContinuousSpeechCallbacks = {};
+  private isRecording: boolean = false;
+  private callbacks: CustomAudioCallbacks = {};
+  private language: string = 'en';
 
-  constructor(lang: string = 'en-IN') {
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition =
-        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        this.recognition = new SpeechRecognition();
-        this.recognition.continuous = true;
-        this.recognition.interimResults = true;
-        this.recognition.lang = lang;
-      }
-    }
+  constructor(language: string = 'en') {
+    this.language = language;
   }
 
   setLanguage(lang: string) {
-    if (this.recognition) {
-      this.recognition.lang = lang;
-    }
+    this.language = lang;
   }
 
-  async start(callbacks: ContinuousSpeechCallbacks) {
+  async start(callbacks: CustomAudioCallbacks): Promise<void> {
     this.callbacks = callbacks;
-    this.currentFullTranscript = '';
-    this.isExplicitlyRecording = true;
+    this.audioChunks = [];
+    this.isRecording = true;
 
-    // Start Web Audio Level Meter
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -54,19 +44,20 @@ export class ContinuousSpeechEngine {
       });
       this.stream = stream;
 
+      // Real-time audio waveform level
       const AudioCtx =
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       this.audioContext = new AudioCtx();
       this.analyser = this.audioContext.createAnalyser();
       this.analyser.fftSize = 128;
-      const source = this.audioContext.createMediaStreamSource(stream);
-      source.connect(this.analyser);
+      this.source = this.audioContext.createMediaStreamSource(stream);
+      this.source.connect(this.analyser);
 
       if (callbacks.onAudioLevel) {
         const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
         const checkLevel = () => {
-          if (!this.analyser || !this.isExplicitlyRecording) return;
+          if (!this.analyser || !this.isRecording) return;
           this.analyser.getByteFrequencyData(dataArray);
           let sum = 0;
           for (let i = 0; i < dataArray.length; i++) {
@@ -79,68 +70,36 @@ export class ContinuousSpeechEngine {
         };
         checkLevel();
       }
-    } catch (err: any) {
-      console.warn('Microphone stream error:', err);
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        callbacks.onError?.('Microphone permission denied. Please allow microphone access in your browser settings.');
-        this.isExplicitlyRecording = false;
-        return;
-      }
-    }
 
-    if (!this.recognition) {
-      callbacks.onError?.('Speech recognition is not supported in this browser. Please use Google Chrome, Edge, or Safari.');
-      return;
-    }
+      // MediaRecorder for raw audio chunks
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : 'audio/mp4';
 
-    this.recognition.onstart = () => {
+      this.mediaRecorder = new MediaRecorder(stream, { mimeType });
+      this.mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          this.audioChunks.push(event.data);
+        }
+      };
+
+      this.mediaRecorder.start(100);
       callbacks.onStart?.();
-    };
-
-    this.recognition.onresult = (event: any) => {
-      let interim = '';
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          this.currentFullTranscript += ' ' + event.results[i][0].transcript;
-        } else {
-          interim += event.results[i][0].transcript;
-        }
-      }
-      const combined = (this.currentFullTranscript + ' ' + interim).trim();
-      callbacks.onInterimResult?.(combined);
-    };
-
-    this.recognition.onerror = (event: any) => {
-      if (event.error !== 'no-speech') {
-        console.warn('Speech recognition error:', event.error);
-        if (event.error === 'not-allowed') {
-          callbacks.onError?.('Microphone permission denied.');
-        }
-      }
-    };
-
-    // Continuous listening: If recognition ends while isExplicitlyRecording is true (due to pause), restart!
-    this.recognition.onend = () => {
-      if (this.isExplicitlyRecording) {
-        try {
-          this.recognition.start();
-        } catch (e) {
-          // Restart gracefully
-        }
+    } catch (err: any) {
+      this.isRecording = false;
+      console.error('Audio recording start error:', err);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        callbacks.onError?.('Microphone permission denied. Please allow microphone access in your browser.');
       } else {
-        callbacks.onEnd?.();
+        callbacks.onError?.(err.message || 'Failed to start microphone recording.');
       }
-    };
-
-    try {
-      this.recognition.start();
-    } catch (err) {
-      console.warn('Recognition start exception:', err);
     }
   }
 
-  stop(): string {
-    this.isExplicitlyRecording = false;
+  async stop(apiKey?: string): Promise<string> {
+    this.isRecording = false;
 
     if (this.animFrameId) {
       cancelAnimationFrame(this.animFrameId);
@@ -152,19 +111,62 @@ export class ContinuousSpeechEngine {
       this.audioContext = null;
     }
 
+    return new Promise((resolve) => {
+      if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') {
+        this.cleanup();
+        resolve('');
+        return;
+      }
+
+      this.mediaRecorder.onstop = async () => {
+        const mimeType = this.mediaRecorder?.mimeType || 'audio/webm';
+        const audioBlob = new Blob(this.audioChunks, { type: mimeType });
+        this.cleanup();
+
+        try {
+          this.callbacks.onInterimResult?.('Transcribing audio with Whisper AI...');
+
+          const formData = new FormData();
+          formData.append('audio', audioBlob);
+          const keyToUse = apiKey || (typeof window !== 'undefined' ? localStorage.getItem('dahod_whisper_api_key') || '' : '');
+          if (keyToUse) {
+            formData.append('apiKey', keyToUse);
+            formData.append('service', keyToUse.startsWith('gsk_') ? 'groq' : 'openai');
+          }
+          formData.append('language', this.language);
+
+          const res = await fetch('/api/transcribe', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const transcript = data.transcript || '';
+            this.callbacks.onFinalResult?.(transcript);
+            resolve(transcript);
+            return;
+          } else {
+            const err = await res.json();
+            this.callbacks.onError?.(err.message || 'Transcription failed.');
+            resolve('');
+          }
+        } catch (e: any) {
+          console.error('Transcription request error:', e);
+          this.callbacks.onError?.('Failed to reach transcription server.');
+          resolve('');
+        }
+      };
+
+      this.mediaRecorder.stop();
+    });
+  }
+
+  private cleanup() {
     if (this.stream) {
       this.stream.getTracks().forEach((track) => track.stop());
       this.stream = null;
     }
-
-    if (this.recognition) {
-      try {
-        this.recognition.stop();
-      } catch (e) {}
-    }
-
-    const finalTranscript = this.currentFullTranscript.trim();
-    this.callbacks.onFinalResult?.(finalTranscript);
-    return finalTranscript;
+    this.callbacks.onEnd?.();
   }
 }

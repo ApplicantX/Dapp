@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Customer, MetalType, Ornament } from '@/lib/types';
-import { ContinuousSpeechEngine } from '@/lib/speechEngine';
+import { CustomDirectAudioEngine } from '@/lib/speechEngine';
 import { parseLoanVoice } from '@/lib/voiceParser';
 import {
   X,
@@ -45,14 +45,17 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
     },
   ]);
 
-  // Voice recording state
+  // Custom Audio state
   const [isRecording, setIsRecording] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState('');
-  const speechEngineRef = useRef<ContinuousSpeechEngine | null>(null);
+  const speechEngineRef = useRef<CustomDirectAudioEngine | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
-      stopRecording();
+      if (speechEngineRef.current) speechEngineRef.current.stop();
+      setIsRecording(false);
+      setIsProcessing(false);
       setLiveTranscript('');
       setLoanAmount(50000);
       setLoanDate(new Date().toISOString().split('T')[0]);
@@ -72,19 +75,13 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
 
   const startRecording = async () => {
     try {
-      setLiveTranscript('');
+      setLiveTranscript('Recording raw audio from microphone...');
       setIsRecording(true);
 
-      speechEngineRef.current = new ContinuousSpeechEngine('en-IN');
+      speechEngineRef.current = new CustomDirectAudioEngine('en');
       await speechEngineRef.current.start({
-        onInterimResult: (transcript) => {
-          setLiveTranscript(transcript);
-        },
-        onFinalResult: (transcript) => {
-          setLiveTranscript(transcript);
-        },
         onError: (err) => {
-          console.warn('Voice recording error:', err);
+          alert(err);
           setIsRecording(false);
         },
       });
@@ -94,28 +91,35 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
     }
   };
 
-  const stopRecording = () => {
-    if (speechEngineRef.current) {
-      const fullText = speechEngineRef.current.stop();
-      if (fullText.trim()) {
-        const parsed = parseLoanVoice(fullText, categories);
-        if (parsed.loanAmount) setLoanAmount(parsed.loanAmount);
-        if (parsed.loanDate) setLoanDate(parsed.loanDate);
-        if (parsed.ornaments && parsed.ornaments.length > 0) {
-          setOrnaments(
-            parsed.ornaments.map((o, idx) => ({
-              id: `orn-voice-${Date.now()}-${idx}`,
-              metal: o.metal,
-              category: o.category,
-              weight: o.weight,
-              quantity: o.quantity,
-              description: '',
-            }))
-          );
-        }
-      }
-    }
+  const stopRecording = async () => {
+    if (!speechEngineRef.current) return;
     setIsRecording(false);
+    setIsProcessing(true);
+    setLiveTranscript('Transcribing audio with Whisper AI...');
+
+    const transcript = await speechEngineRef.current.stop();
+    setIsProcessing(false);
+
+    if (transcript && transcript.trim()) {
+      setLiveTranscript(transcript);
+      const parsed = parseLoanVoice(transcript, categories);
+      if (parsed.loanAmount) setLoanAmount(parsed.loanAmount);
+      if (parsed.loanDate) setLoanDate(parsed.loanDate);
+      if (parsed.ornaments && parsed.ornaments.length > 0) {
+        setOrnaments(
+          parsed.ornaments.map((o, idx) => ({
+            id: `orn-voice-${Date.now()}-${idx}`,
+            metal: o.metal,
+            category: o.category,
+            weight: o.weight,
+            quantity: o.quantity,
+            description: '',
+          }))
+        );
+      }
+    } else {
+      setLiveTranscript('No audio transcribed.');
+    }
   };
 
   const updateOrnament = (index: number, updates: Partial<Ornament>) => {
@@ -197,12 +201,12 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
           </div>
         </div>
 
-        {/* Minimal Voice Bar */}
+        {/* Voice Bar */}
         <div className="bg-[#1c0733] p-4 rounded-2xl border border-purple-500/15 flex items-center justify-between gap-3 mb-5">
           <div className="space-y-0.5">
             <span className="text-[11px] font-bold text-gold-300 uppercase tracking-wider flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-gold-400" />
-              <span>Voice Loan Capture</span>
+              <span>Direct Audio Voice Capture</span>
             </span>
             <p className="text-xs text-purple-200/70">
               Speak amount and ornaments (e.g. *"500g silver kandora and 200g silver kada for 50,000 rupees"*).
@@ -212,17 +216,22 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
           <button
             type="button"
             onClick={isRecording ? stopRecording : startRecording}
+            disabled={isProcessing}
             className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full font-bold text-xs transition-all flex-shrink-0 active:scale-95 ${
               isRecording
                 ? 'bg-rose-600 text-white border border-rose-300 shadow-[0_0_20px_rgba(225,29,72,0.5)] animate-pulse'
+                : isProcessing
+                ? 'bg-purple-800 text-purple-300'
                 : 'bg-gold-500 hover:bg-gold-400 text-purple-950 shadow-gold-glow'
             }`}
           >
             {isRecording ? (
               <>
                 <MicOff className="w-3.5 h-3.5 animate-bounce" />
-                <span>STOP</span>
+                <span>STOP & TRANSCRIBE</span>
               </>
+            ) : isProcessing ? (
+              <span>WAIT...</span>
             ) : (
               <>
                 <Mic className="w-3.5 h-3.5" />
@@ -235,14 +244,13 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
         {liveTranscript && (
           <div className="bg-[#1c0733] p-3 rounded-2xl border border-purple-500/20 text-xs mb-4">
             <span className="font-semibold text-gold-300 uppercase text-[10px] block mb-0.5">
-              Captured Voice:
+              Transcription Output:
             </span>
             <p className="text-xs font-medium text-white italic">"{liveTranscript}"</p>
           </div>
         )}
 
         <form onSubmit={handleSave} className="space-y-4">
-          {/* Loan Amount & Date */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-[#1c0733] p-4 rounded-2xl border border-purple-500/15">
             <div className="space-y-1">
               <label className="text-xs font-bold text-gold-300">
@@ -272,7 +280,6 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
             </div>
           </div>
 
-          {/* Ornaments List */}
           <div className="bg-[#1c0733] p-4 rounded-2xl border border-purple-500/15 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-gold-300 uppercase tracking-wider flex items-center gap-1.5">
@@ -378,7 +385,6 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
             </div>
           </div>
 
-          {/* Notes */}
           <div className="space-y-1">
             <label className="text-xs font-semibold text-purple-200/70">Notes (Optional)</label>
             <input
@@ -390,7 +396,6 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
             />
           </div>
 
-          {/* Actions */}
           <div className="flex items-center justify-end gap-2 pt-2">
             <button
               type="button"

@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { Customer, Loan } from '@/lib/types';
-import { ContinuousSpeechEngine } from '@/lib/speechEngine';
+import { CustomDirectAudioEngine } from '@/lib/speechEngine';
 import {
   Search,
   Mic,
@@ -32,25 +32,17 @@ export const CustomerList: React.FC<CustomerListProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isVoiceSearching, setIsVoiceSearching] = useState(false);
   const [voiceSearchText, setVoiceSearchText] = useState('');
-  const speechEngineRef = useRef<ContinuousSpeechEngine | null>(null);
+  const speechEngineRef = useRef<CustomDirectAudioEngine | null>(null);
 
-  // Voice Search Handler
+  // Custom Audio Voice Search Handler
   const startVoiceSearch = async () => {
     try {
       setIsVoiceSearching(true);
-      setVoiceSearchText('Listening for customer name or village...');
-      speechEngineRef.current = new ContinuousSpeechEngine('en-IN');
+      setVoiceSearchText('Recording audio... Speak name or village.');
+      speechEngineRef.current = new CustomDirectAudioEngine('en');
       await speechEngineRef.current.start({
-        onInterimResult: (transcript) => {
-          setVoiceSearchText(transcript);
-          setSearchQuery(transcript);
-        },
-        onFinalResult: (transcript) => {
-          setVoiceSearchText(transcript);
-          setSearchQuery(transcript);
-        },
         onError: (err) => {
-          console.warn('Voice search error:', err);
+          alert(err);
           setIsVoiceSearching(false);
         },
       });
@@ -60,14 +52,15 @@ export const CustomerList: React.FC<CustomerListProps> = ({
     }
   };
 
-  const stopVoiceSearch = () => {
-    if (speechEngineRef.current) {
-      const finalResult = speechEngineRef.current.stop();
-      if (finalResult) {
-        setSearchQuery(finalResult);
-      }
-    }
+  const stopVoiceSearch = async () => {
+    if (!speechEngineRef.current) return;
+    setVoiceSearchText('Transcribing with Whisper AI...');
+    const transcript = await speechEngineRef.current.stop();
     setIsVoiceSearching(false);
+    if (transcript && transcript.trim()) {
+      setSearchQuery(transcript.trim());
+      setVoiceSearchText('');
+    }
   };
 
   // Fuzzy Search filter on Name & Village
@@ -122,7 +115,7 @@ export const CustomerList: React.FC<CustomerListProps> = ({
             {isVoiceSearching ? (
               <>
                 <MicOff className="w-4 h-4 animate-bounce" />
-                <span>STOP</span>
+                <span>STOP & SEARCH</span>
               </>
             ) : (
               <>
@@ -147,10 +140,10 @@ export const CustomerList: React.FC<CustomerListProps> = ({
         {isVoiceSearching && (
           <div className="bg-purple-900/60 p-3 rounded-2xl border border-gold-400/40 text-center animate-pulse">
             <span className="text-[11px] text-gold-300 font-semibold uppercase tracking-wider block">
-              Continuous Voice Search Active
+              Recording Voice... Tap STOP & SEARCH when done.
             </span>
             <p className="text-sm font-bold text-white mt-0.5">
-              "{voiceSearchText || 'Listening for customer name or village...'}"
+              "{voiceSearchText || 'Listening...'}"
             </p>
           </div>
         )}

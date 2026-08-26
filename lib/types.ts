@@ -39,7 +39,7 @@ export interface ActivityLog {
   id: string;
   timestamp: string;
   user: string;
-  action: 'CREATE_CUSTOMER' | 'EDIT_CUSTOMER' | 'ADD_LOAN' | 'EDIT_LOAN' | 'CLOSE_LOAN' | 'DELETE_LOAN' | 'MOVE_DIARY_PAGE' | 'BULK_IMPORT';
+  action: 'CREATE_CUSTOMER' | 'EDIT_CUSTOMER' | 'ADD_LOAN' | 'EDIT_LOAN' | 'CLOSE_LOAN' | 'DELETE_LOAN' | 'MOVE_DIARY_PAGE' | 'BULK_IMPORT' | 'AUTH_LOGIN' | 'REVOKE_DEVICE';
   customerName: string;
   village: string;
   details: string;
@@ -106,4 +106,23 @@ export interface BulkCustomerLoanRecord {
   rawSpeech: string;
   status: 'VALID' | 'WARNING';
   warningMessage?: string;
+}
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  picture?: string;
+  role: 'Family Admin' | 'Family Member';
+  signedInAt: string;
+  deviceInfo?: string;
+}
+
+export interface DeviceAccessRecord {
+  id: string;
+  userEmail: string;
+  userName: string;
+  deviceName: string;
+  lastActive: string;
+  isRevoked: boolean;
 }

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Customer, ParsedCustomerVoice } from '@/lib/types';
-import { ContinuousSpeechEngine } from '@/lib/speechEngine';
+import { CustomDirectAudioEngine } from '@/lib/speechEngine';
 import { parseBulkCustomersVoice } from '@/lib/voiceParser';
 import {
   X,
@@ -35,11 +35,12 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'VOICE' | 'MANUAL'>('VOICE');
 
-  // Continuous Voice State
+  // Custom Audio State
   const [isRecording, setIsRecording] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState('');
   const [parsedCards, setParsedCards] = useState<ParsedCustomerVoice[]>([]);
-  const speechEngineRef = useRef<ContinuousSpeechEngine | null>(null);
+  const speechEngineRef = useRef<CustomDirectAudioEngine | null>(null);
 
   // Manual Form State
   const [name, setName] = useState('');
@@ -53,7 +54,9 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) {
-      stopRecording();
+      if (speechEngineRef.current) speechEngineRef.current.stop();
+      setIsRecording(false);
+      setIsProcessing(false);
       setLiveTranscript('');
       setParsedCards([]);
       setName('');
@@ -65,20 +68,14 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
 
   const startRecording = async () => {
     try {
-      setLiveTranscript('');
+      setLiveTranscript('Recording audio directly from microphone...');
       setParsedCards([]);
       setIsRecording(true);
 
-      speechEngineRef.current = new ContinuousSpeechEngine('en-IN');
+      speechEngineRef.current = new CustomDirectAudioEngine('en');
       await speechEngineRef.current.start({
-        onInterimResult: (transcript) => {
-          setLiveTranscript(transcript);
-        },
-        onFinalResult: (transcript) => {
-          setLiveTranscript(transcript);
-        },
         onError: (err) => {
-          console.warn('Voice recording error:', err);
+          alert(err);
           setIsRecording(false);
         },
       });
@@ -88,15 +85,22 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
     }
   };
 
-  const stopRecording = () => {
-    if (speechEngineRef.current) {
-      const fullText = speechEngineRef.current.stop();
-      if (fullText.trim()) {
-        const results = parseBulkCustomersVoice(fullText, villages);
-        setParsedCards(results);
-      }
-    }
+  const stopRecording = async () => {
+    if (!speechEngineRef.current) return;
     setIsRecording(false);
+    setIsProcessing(true);
+    setLiveTranscript('Transcribing audio with Whisper AI...');
+
+    const transcript = await speechEngineRef.current.stop();
+    setIsProcessing(false);
+
+    if (transcript && transcript.trim()) {
+      setLiveTranscript(transcript);
+      const results = parseBulkCustomersVoice(transcript, villages);
+      setParsedCards(results);
+    } else {
+      setLiveTranscript('No speech detected in recording.');
+    }
   };
 
   const updateParsedCard = (index: number, updates: Partial<ParsedCustomerVoice>) => {
@@ -189,12 +193,12 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
               Add Customer Account
             </h2>
             <p className="text-xs text-purple-200/60 font-medium">
-              Voice-first or manual entry with physical diary reference.
+              Custom AI voice or manual entry with physical diary reference.
             </p>
           </div>
         </div>
 
-        {/* Mode Tabs (Google Pill Style) */}
+        {/* Mode Tabs */}
         <div className="flex items-center gap-1 mb-6 bg-[#1c0733] p-1 rounded-full border border-purple-500/15">
           <button
             type="button"
@@ -224,14 +228,16 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
         {/* VOICE TAB */}
         {activeTab === 'VOICE' && (
           <div className="space-y-5">
-            {/* Center Microphone Button */}
             <div className="flex flex-col items-center justify-center py-6 bg-[#1c0733]/60 rounded-3xl border border-purple-500/15">
               <button
                 type="button"
                 onClick={isRecording ? stopRecording : startRecording}
+                disabled={isProcessing}
                 className={`relative w-24 h-24 rounded-full flex flex-col items-center justify-center border-2 transition-all transform active:scale-95 ${
                   isRecording
                     ? 'bg-rose-600 border-rose-300 text-white shadow-[0_0_30px_rgba(225,29,72,0.6)] animate-pulse'
+                    : isProcessing
+                    ? 'bg-purple-800 border-purple-600 text-purple-300'
                     : 'bg-gradient-to-tr from-purple-700 via-purple-600 to-gold-500 border-gold-400 shadow-purple-glow hover:scale-105'
                 }`}
               >
@@ -240,6 +246,8 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
                     <MicOff className="w-8 h-8 text-white animate-bounce" />
                     <span className="text-[10px] font-bold uppercase text-white mt-1">STOP</span>
                   </>
+                ) : isProcessing ? (
+                  <span className="text-[10px] font-bold">WAIT...</span>
                 ) : (
                   <>
                     <Mic className="w-8 h-8 text-white" />
@@ -250,22 +258,22 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
 
               <p className="text-xs font-medium text-purple-200/70 mt-3 text-center px-4 max-w-md">
                 {isRecording
-                  ? 'Listening continuously... Speak one or multiple customers. Tap STOP when finished.'
+                  ? 'Recording raw audio... Speak one or multiple customers. Tap STOP when finished.'
+                  : isProcessing
+                  ? 'Transcribing audio with Whisper AI...'
                   : 'Tap and speak: "Ramesh Mishra from Vova village, Diary 2026, Page 142"'}
               </p>
             </div>
 
-            {/* Live Transcript Display */}
             {liveTranscript && (
               <div className="bg-[#1c0733] p-3.5 rounded-2xl border border-purple-500/20 text-xs">
                 <span className="font-semibold text-gold-300 uppercase tracking-wider block text-[10px] mb-0.5">
-                  Voice Transcript:
+                  Transcription Output:
                 </span>
                 <p className="text-xs font-medium text-white italic">"{liveTranscript}"</p>
               </div>
             )}
 
-            {/* Parsed Numbered Customer Cards */}
             {parsedCards.length > 0 && (
               <div className="space-y-3">
                 <span className="text-xs font-bold text-gold-300 uppercase tracking-wider flex items-center gap-1.5">
@@ -373,7 +381,6 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
               </div>
             )}
 
-            {/* Name */}
             <div className="space-y-1">
               <label className="text-xs font-semibold text-purple-200/80">
                 Customer Name <span className="text-rose-400">*</span>
@@ -388,7 +395,6 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
               />
             </div>
 
-            {/* Village */}
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-purple-200/80">
@@ -427,7 +433,6 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
               )}
             </div>
 
-            {/* Diary & Page */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-purple-200/80">
@@ -458,7 +463,6 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
               </div>
             </div>
 
-            {/* Mobile */}
             <div className="space-y-1">
               <label className="text-xs font-semibold text-purple-200/70">Mobile Number (Optional)</label>
               <input
@@ -470,7 +474,6 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
               />
             </div>
 
-            {/* Actions */}
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"

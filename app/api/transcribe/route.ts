@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No audio file provided' }, { status: 400 });
     }
 
-    // If an API key is provided (Groq or OpenAI), call Whisper
+    // If an API key is provided (Groq or OpenAI), call Whisper AI
     if (apiKey) {
       const isGroq = service === 'groq' || apiKey.startsWith('gsk_');
       const endpoint = isGroq
@@ -25,7 +25,10 @@ export async function POST(req: NextRequest) {
       if (language && language !== 'auto') {
         whisperFormData.append('language', language);
       }
-      whisperFormData.append('prompt', 'Jewelry store gold and silver loan accounting, गिरवी, ગિરવે, grams, tola, karat, interest');
+      whisperFormData.append(
+        'prompt',
+        'Dahod jewellery store customer records, gold and silver loans, गिरवी, ગિરવે, Ramesh Patel, Suresh Damor, Vova village, Garbada, Limkheda, Kandora, Kada, grams, tola, diary page'
+      );
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -51,11 +54,34 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // If no external Whisper API key configured, return informative response
+    // Try free public HuggingFace Whisper endpoint if no key is configured
+    try {
+      const hfResponse = await fetch('https://api-inference.huggingface.co/models/openai/whisper-large-v3', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'audio/webm',
+        },
+        body: audioFile,
+      });
+
+      if (hfResponse.ok) {
+        const hfData = await hfResponse.json();
+        if (hfData && hfData.text) {
+          return NextResponse.json({
+            transcript: hfData.text,
+            source: 'huggingface_whisper',
+          });
+        }
+      }
+    } catch (hfErr) {
+      console.warn('Huggingface Whisper fallback attempt:', hfErr);
+    }
+
+    // If no cloud API key is configured yet, return clear prompt with setup guide
     return NextResponse.json({
       transcript: '',
       requiresKey: true,
-      message: 'No Whisper API key configured. Utilizing real-time high-fidelity Speech Recognition engine with Indian accent calibration.',
+      message: 'To use our custom Whisper Speech Engine, please provide a Groq or OpenAI API key in Settings or enter it when prompted.',
     });
   } catch (error: any) {
     console.error('Transcribe error:', error);

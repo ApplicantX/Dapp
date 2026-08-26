@@ -2,13 +2,12 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { AppData, BulkCustomerLoanRecord } from '@/lib/types';
-import { ContinuousSpeechEngine } from '@/lib/speechEngine';
+import { CustomDirectAudioEngine } from '@/lib/speechEngine';
 import { parseBulkVoiceToExcelRecords } from '@/lib/voiceParser';
 import { exportBulkRecordsToExcel, commitBulkRecordsToDatabase } from '@/lib/storage';
 import {
   Mic,
   MicOff,
-  FileSpreadsheet,
   Download,
   Database,
   Trash2,
@@ -18,8 +17,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   ClipboardPaste,
-  Edit3,
-  RotateCcw,
+  Key,
+  KeyRound,
   Volume2,
 } from 'lucide-react';
 
@@ -34,19 +33,30 @@ export const BulkDataInputTab: React.FC<BulkDataInputTabProps> = ({
 }) => {
   const [records, setRecords] = useState<BulkCustomerLoanRecord[]>([]);
   const [isRecording, setIsRecording] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState('');
   const [searchFilter, setSearchFilter] = useState('');
+  const [audioLevel, setAudioLevel] = useState(0);
   const [showPasteModal, setShowPasteModal] = useState(false);
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [apiKey, setApiKey] = useState('');
   const [pastedText, setPastedText] = useState('');
   const [committedCount, setCommittedCount] = useState<number | null>(null);
 
-  const speechEngineRef = useRef<ContinuousSpeechEngine | null>(null);
-  const lastProcessedLengthRef = useRef<number>(0);
+  const audioEngineRef = useRef<CustomDirectAudioEngine | null>(null);
 
-  // Initialize with a few helpful starter records if empty
+  // Load API Key from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedKey = localStorage.getItem('dahod_whisper_api_key') || '';
+      setApiKey(savedKey);
+    }
+  }, []);
+
+  // Initialize with sample records if empty
   useEffect(() => {
     if (records.length === 0) {
-      const sampleBatch = [
+      const sampleBatch: BulkCustomerLoanRecord[] = [
         {
           id: 'starter-1',
           name: 'Ramesh Mishra',
@@ -55,12 +65,12 @@ export const BulkDataInputTab: React.FC<BulkDataInputTabProps> = ({
           pageNumber: '142',
           mobile: '9825123456',
           loanAmount: 50000,
-          metal: 'Silver' as const,
+          metal: 'Silver',
           category: 'Kandora',
           weight: 500,
           quantity: 1,
           rawSpeech: 'Ramesh Mishra from Vova village Diary 2026 Page 142 500g silver kandora 50000 rupees',
-          status: 'VALID' as const,
+          status: 'VALID',
         },
         {
           id: 'starter-2',
@@ -70,59 +80,66 @@ export const BulkDataInputTab: React.FC<BulkDataInputTabProps> = ({
           pageNumber: '84',
           mobile: '9426589123',
           loanAmount: 45000,
-          metal: 'Gold' as const,
+          metal: 'Gold',
           category: 'Chain',
           weight: 18.5,
           quantity: 1,
           rawSpeech: 'Suresh Damor from Garbada Diary 2025 Page 84 18.5g gold chain 45000 rupees',
-          status: 'VALID' as const,
+          status: 'VALID',
         },
       ];
       setRecords(sampleBatch);
     }
   }, []);
 
-  // Continuous Voice Stream handler
-  const startContinuousCapture = async () => {
+  // Custom Audio Recording Start
+  const startRecording = async () => {
     try {
       setIsRecording(true);
-      lastProcessedLengthRef.current = 0;
-
-      speechEngineRef.current = new ContinuousSpeechEngine('en-IN');
-      await speechEngineRef.current.start({
-        onInterimResult: (transcript) => {
-          setLiveTranscript(transcript);
-        },
-        onFinalResult: (transcript) => {
-          setLiveTranscript(transcript);
-          // Stream and parse new records as they are spoken
-          const parsed = parseBulkVoiceToExcelRecords(transcript, appData.villages, appData.ornamentCategories);
-          if (parsed.length > 0) {
-            setRecords(parsed);
-          }
-        },
+      setLiveTranscript('Recording audio... Speak customer names, villages, diaries, and loans.');
+      audioEngineRef.current = new CustomDirectAudioEngine('en');
+      await audioEngineRef.current.start({
+        onAudioLevel: (lvl) => setAudioLevel(lvl),
         onError: (err) => {
-          console.warn('Continuous recording error:', err);
+          alert(err);
           setIsRecording(false);
         },
       });
     } catch (e) {
-      console.warn('Voice stream start error:', e);
+      console.error('Audio recording start error:', e);
       setIsRecording(false);
     }
   };
 
-  const stopContinuousCapture = () => {
-    if (speechEngineRef.current) {
-      const fullText = speechEngineRef.current.stop();
-      if (fullText.trim()) {
-        const parsed = parseBulkVoiceToExcelRecords(fullText, appData.villages, appData.ornamentCategories);
-        if (parsed.length > 0) {
-          setRecords(parsed);
-        }
-      }
-    }
+  // Custom Audio Recording Stop & Direct Whisper Transcription
+  const stopRecording = async () => {
+    if (!audioEngineRef.current) return;
     setIsRecording(false);
+    setIsProcessing(true);
+    setLiveTranscript('Processing audio with custom Whisper AI engine...');
+
+    const transcript = await audioEngineRef.current.stop(apiKey);
+    setIsProcessing(false);
+    setAudioLevel(0);
+
+    if (transcript && transcript.trim()) {
+      setLiveTranscript(transcript);
+      const parsed = parseBulkVoiceToExcelRecords(transcript, appData.villages, appData.ornamentCategories);
+      if (parsed.length > 0) {
+        setRecords((prev) => [...parsed, ...prev]);
+      }
+    } else {
+      setLiveTranscript('No transcript returned. Please ensure an API key is configured or paste text below.');
+    }
+  };
+
+  const handleSaveApiKey = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dahod_whisper_api_key', apiKey.trim());
+    }
+    setShowKeyModal(false);
+    alert('Whisper Speech API Key saved successfully!');
   };
 
   // Handle Pasted Text Parsing
@@ -130,11 +147,11 @@ export const BulkDataInputTab: React.FC<BulkDataInputTabProps> = ({
     if (!pastedText.trim()) return;
     const parsed = parseBulkVoiceToExcelRecords(pastedText, appData.villages, appData.ornamentCategories);
     if (parsed.length > 0) {
-      setRecords((prev) => [...prev, ...parsed]);
+      setRecords((prev) => [...parsed, ...prev]);
       setShowPasteModal(false);
       setPastedText('');
     } else {
-      alert('Could not parse customer records from pasted text. Please check text format.');
+      alert('Could not parse customer records from text. Please verify format.');
     }
   };
 
@@ -144,7 +161,6 @@ export const BulkDataInputTab: React.FC<BulkDataInputTabProps> = ({
       prev.map((r) => {
         if (r.id === id) {
           const updated = { ...r, [field]: value };
-          // Re-evaluate validation status
           if (updated.name && updated.village && updated.pageNumber) {
             updated.status = 'VALID';
             updated.warningMessage = undefined;
@@ -194,7 +210,7 @@ export const BulkDataInputTab: React.FC<BulkDataInputTabProps> = ({
   const handleCommitToDatabase = () => {
     if (records.length === 0) return;
     const confirmCommit = window.confirm(
-      `Commit all ${records.length} customer records and their loans directly to the app database?`
+      `Commit all ${records.length} customer records and their loans directly into the app database?`
     );
     if (confirmCommit) {
       const updated = commitBulkRecordsToDatabase(appData, records);
@@ -225,61 +241,73 @@ export const BulkDataInputTab: React.FC<BulkDataInputTabProps> = ({
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
-      {/* Top Banner & Control Deck */}
+      {/* Control Deck */}
       <div className="bg-[#130324]/90 p-6 sm:p-8 rounded-3xl border border-purple-500/20 shadow-card space-y-6">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold-500/10 border border-gold-500/25 text-gold-300 text-xs font-semibold">
               <Sparkles className="w-3.5 h-3.5 text-gold-400" />
-              <span>High-Throughput Voice Data Entry (500+ Customers)</span>
+              <span>Dedicated AI Audio Engine (No Browser Speech API)</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-serif">
-              Continuous Voice to Excel Engine
+              Custom Voice to Excel Engine
             </h1>
             <p className="text-xs sm:text-sm text-purple-200/70 max-w-xl">
-              Speak continuously without interruption. Every customer, village, physical page, and ornament is automatically captured into the live spreadsheet below with zero prompts.
+              Captures raw audio directly from your microphone and transcribes with Whisper AI. Every customer and loan item streams into the spreadsheet with zero repeated prompts.
             </p>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Download Excel Button */}
+          {/* Actions */}
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleDownloadExcel}
-              className="flex items-center gap-2 px-5 py-3 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm shadow-sm transition-all active:scale-95"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-sm transition-all active:scale-95"
             >
               <Download className="w-4 h-4" />
               <span>Download Excel (.xlsx)</span>
             </button>
 
-            {/* Commit to Database */}
             <button
               onClick={handleCommitToDatabase}
-              className="flex items-center gap-2 px-5 py-3 rounded-full bg-gold-500 hover:bg-gold-400 text-purple-950 font-bold text-xs sm:text-sm shadow-gold-glow transition-all active:scale-95"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-gold-500 hover:bg-gold-400 text-purple-950 font-bold text-xs shadow-gold-glow transition-all active:scale-95"
             >
               <Database className="w-4 h-4" />
               <span>Save to App ({records.length})</span>
             </button>
 
-            {/* Paste Transcript Button */}
             <button
               onClick={() => setShowPasteModal(true)}
-              className="p-3 rounded-full bg-purple-900/60 hover:bg-purple-800 text-purple-200 hover:text-white border border-purple-500/20 transition-all"
+              className="p-2.5 rounded-full bg-purple-900/60 hover:bg-purple-800 text-purple-200 hover:text-white border border-purple-500/20 transition-all"
               title="Paste Bulk Text / Audio Transcript"
             >
               <ClipboardPaste className="w-4 h-4" />
             </button>
+
+            <button
+              onClick={() => setShowKeyModal(true)}
+              className={`p-2.5 rounded-full border transition-all ${
+                apiKey
+                  ? 'bg-purple-900/60 text-gold-300 border-gold-500/30'
+                  : 'bg-amber-950/80 text-amber-300 border-amber-500/50 animate-pulse'
+              }`}
+              title="Configure Whisper AI Speech Key"
+            >
+              <KeyRound className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
-        {/* Big Continuous Microphone Button Deck */}
+        {/* Custom Audio Recorder Bar */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-6 p-6 rounded-3xl bg-[#1c0733]/80 border border-purple-500/20">
           <div className="flex items-center gap-4">
             <button
-              onClick={isRecording ? stopContinuousCapture : startContinuousCapture}
+              onClick={isRecording ? stopRecording : startRecording}
+              disabled={isProcessing}
               className={`relative w-20 h-20 rounded-full flex flex-col items-center justify-center border-2 transition-all transform active:scale-95 flex-shrink-0 ${
                 isRecording
                   ? 'bg-rose-600 border-rose-300 text-white shadow-[0_0_35px_rgba(225,29,72,0.7)] animate-pulse'
+                  : isProcessing
+                  ? 'bg-purple-800 border-purple-600 text-purple-300 opacity-80'
                   : 'bg-gradient-to-tr from-purple-700 via-purple-600 to-gold-500 border-gold-400 shadow-purple-glow hover:scale-105'
               }`}
             >
@@ -288,6 +316,8 @@ export const BulkDataInputTab: React.FC<BulkDataInputTabProps> = ({
                   <MicOff className="w-7 h-7 text-white animate-bounce" />
                   <span className="text-[10px] font-black uppercase text-white mt-0.5">STOP</span>
                 </>
+              ) : isProcessing ? (
+                <span className="text-[10px] font-bold">WAIT...</span>
               ) : (
                 <>
                   <Mic className="w-7 h-7 text-white" />
@@ -298,21 +328,39 @@ export const BulkDataInputTab: React.FC<BulkDataInputTabProps> = ({
 
             <div className="space-y-1">
               <span className="text-xs font-bold uppercase tracking-wider text-gold-300 block">
-                {isRecording ? '● Live Continuous Recording Active' : 'Ready for Continuous Input'}
+                {isRecording
+                  ? '● Live Audio Recording (Direct Web Audio)'
+                  : isProcessing
+                  ? '⏳ Transcribing with Whisper AI...'
+                  : 'Ready to Record Voice Data'}
               </span>
               <p className="text-xs text-purple-200/80 max-w-md">
                 {isRecording
-                  ? 'Speak all 500+ customer accounts back-to-back. The microphone keeps listening through pauses until you tap STOP.'
-                  : 'Tap RECORD and start speaking: "1. Ramesh Patel Vova village Diary 2026 Page 12 50000 silver kandora 500g, 2. Suresh Damor Garbada..."'}
+                  ? 'Microphone is capturing raw audio. Speak customer details continuously and tap STOP when done.'
+                  : 'Click RECORD and speak: "1. Ramesh Patel Vova village Diary 2026 Page 12 50000 silver kandora 500g, 2. Suresh Damor Garbada..."'}
               </p>
             </div>
           </div>
 
-          {/* Committed Banner */}
+          {/* Audio Visualizer Waves */}
+          {isRecording && (
+            <div className="flex items-center gap-1 h-8">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="w-1 bg-gold-400 rounded-full transition-all duration-75"
+                  style={{
+                    height: `${Math.max(4, Math.round(audioLevel * 32 * (0.4 + 0.6 * Math.sin(i + Date.now() / 200))))}px`,
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
           {committedCount && (
             <div className="px-4 py-2 rounded-2xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center gap-2 animate-bounce">
               <CheckCircle2 className="w-4 h-4" />
-              <span>Successfully imported {committedCount} accounts into App Database!</span>
+              <span>Imported {committedCount} accounts into App Database!</span>
             </div>
           )}
         </div>
@@ -320,88 +368,50 @@ export const BulkDataInputTab: React.FC<BulkDataInputTabProps> = ({
         {/* Live Audio Transcript Box */}
         {liveTranscript && (
           <div className="bg-[#1c0733] p-4 rounded-2xl border border-purple-500/20 text-xs">
-            <div className="flex items-center justify-between mb-1">
-              <span className="font-bold text-gold-300 uppercase tracking-wider text-[10px]">
-                Live Speech Stream:
-              </span>
-              <span className="text-purple-300/60 text-[10px]">
-                Auto-processing into table...
-              </span>
-            </div>
+            <span className="font-bold text-gold-300 uppercase tracking-wider text-[10px] block mb-1">
+              Whisper Audio Transcription Output:
+            </span>
             <p className="text-xs font-medium text-white italic max-h-24 overflow-y-auto leading-relaxed">
               "{liveTranscript}"
             </p>
           </div>
         )}
 
-        {/* High-Throughput Stats Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
-          <div className="bg-[#1c0733]/80 p-3.5 rounded-2xl border border-purple-500/15 text-center">
-            <span className="text-[10px] text-purple-200/60 font-semibold uppercase tracking-wider block">
-              Captured Rows
-            </span>
-            <span className="text-xl font-bold text-white mt-0.5 block">
-              {records.length}
+        {/* Stats Pills */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
+          <div className="bg-[#1c0733]/80 p-3 rounded-2xl border border-purple-500/15 text-center">
+            <span className="text-[10px] text-purple-200/60 font-semibold uppercase block">Rows</span>
+            <span className="text-lg font-bold text-white block">{records.length}</span>
+          </div>
+
+          <div className="bg-[#1c0733]/80 p-3 rounded-2xl border border-purple-500/15 text-center">
+            <span className="text-[10px] text-purple-200/60 font-semibold uppercase block">Total Loan (₹)</span>
+            <span className="text-lg font-bold text-emerald-400 block truncate">₹{totalPrincipal.toLocaleString('en-IN')}</span>
+          </div>
+
+          <div className="bg-[#1c0733]/80 p-3 rounded-2xl border border-purple-500/15 text-center">
+            <span className="text-[10px] text-gold-300/80 font-semibold uppercase block">Gold Weight</span>
+            <span className="text-lg font-bold text-gold-300 block">{totalGoldGrams.toFixed(1)}g</span>
+          </div>
+
+          <div className="bg-[#1c0733]/80 p-3 rounded-2xl border border-purple-500/15 text-center">
+            <span className="text-[10px] text-slate-300/80 font-semibold uppercase block">Silver Weight</span>
+            <span className="text-lg font-bold text-slate-200 block">
+              {totalSilverGrams >= 1000 ? `${(totalSilverGrams / 1000).toFixed(2)} kg` : `${totalSilverGrams.toFixed(0)}g`}
             </span>
           </div>
 
-          <div className="bg-[#1c0733]/80 p-3.5 rounded-2xl border border-purple-500/15 text-center">
-            <span className="text-[10px] text-purple-200/60 font-semibold uppercase tracking-wider block">
-              Total Principal
-            </span>
-            <span className="text-xl font-bold text-emerald-400 mt-0.5 block truncate">
-              ₹{totalPrincipal.toLocaleString('en-IN')}
-            </span>
-          </div>
-
-          <div className="bg-[#1c0733]/80 p-3.5 rounded-2xl border border-purple-500/15 text-center">
-            <span className="text-[10px] text-gold-300/80 font-semibold uppercase tracking-wider block">
-              Gold Weight
-            </span>
-            <span className="text-xl font-bold text-gold-300 mt-0.5 block">
-              {totalGoldGrams.toFixed(1)}g
-            </span>
-          </div>
-
-          <div className="bg-[#1c0733]/80 p-3.5 rounded-2xl border border-purple-500/15 text-center">
-            <span className="text-[10px] text-slate-300/80 font-semibold uppercase tracking-wider block">
-              Silver Weight
-            </span>
-            <span className="text-xl font-bold text-slate-200 mt-0.5 block">
-              {totalSilverGrams >= 1000
-                ? `${(totalSilverGrams / 1000).toFixed(2)} kg`
-                : `${totalSilverGrams.toFixed(0)}g`}
-            </span>
-          </div>
-
-          <div className="bg-[#1c0733]/80 p-3.5 rounded-2xl border border-purple-500/15 text-center">
-            <span className="text-[10px] text-purple-200/60 font-semibold uppercase tracking-wider block">
-              Status
-            </span>
-            <span
-              className={`text-sm font-black mt-1.5 inline-flex items-center gap-1 ${
-                warningCount > 0 ? 'text-amber-400' : 'text-emerald-400'
-              }`}
-            >
-              {warningCount > 0 ? (
-                <>
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  <span>{warningCount} Warnings</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>100% Ready</span>
-                </>
-              )}
+          <div className="bg-[#1c0733]/80 p-3 rounded-2xl border border-purple-500/15 text-center">
+            <span className="text-[10px] text-purple-200/60 font-semibold uppercase block">Status</span>
+            <span className={`text-xs font-bold mt-1 inline-block ${warningCount > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+              {warningCount > 0 ? `${warningCount} Warnings` : 'All Valid'}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Real-Time Live Excel Spreadsheet Table */}
+      {/* Spreadsheet Data Grid */}
       <div className="bg-[#130324]/90 p-5 sm:p-6 rounded-3xl border border-purple-500/20 shadow-card space-y-4">
-        {/* Table Search & Tool Bar */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-300/60" />
@@ -409,7 +419,7 @@ export const BulkDataInputTab: React.FC<BulkDataInputTabProps> = ({
               type="text"
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
-              placeholder="Filter captured rows (e.g. Ramesh, Vova, 142, Kandora)..."
+              placeholder="Filter table rows (e.g. Ramesh, Vova, 142)..."
               className="w-full pl-10 pr-4 py-2 rounded-xl bg-[#1c0733] border border-purple-500/20 text-xs text-white placeholder-purple-200/40 focus:outline-none focus:border-gold-400/60"
             />
           </div>
@@ -437,7 +447,7 @@ export const BulkDataInputTab: React.FC<BulkDataInputTabProps> = ({
           </div>
         </div>
 
-        {/* Spreadsheet Data Grid */}
+        {/* Table */}
         <div className="overflow-x-auto rounded-2xl border border-purple-500/20">
           <table className="w-full text-xs text-left border-collapse">
             <thead className="bg-[#1c0733] text-purple-200/80 font-bold border-b border-purple-500/20 uppercase text-[10px] tracking-wider">
@@ -468,112 +478,90 @@ export const BulkDataInputTab: React.FC<BulkDataInputTabProps> = ({
                   <td className="py-2.5 px-3 text-center text-purple-300/60 font-mono text-[11px]">
                     {idx + 1}
                   </td>
-
-                  {/* Customer Name */}
                   <td className="py-2.5 px-3">
                     <input
                       type="text"
                       value={r.name}
                       onChange={(e) => handleCellEdit(r.id, 'name', e.target.value)}
-                      className="w-full bg-transparent text-white font-bold hover:bg-purple-900/40 px-1.5 py-0.5 rounded focus:bg-[#1c0733] focus:outline-none focus:ring-1 focus:ring-gold-400"
+                      className="w-full bg-transparent text-white font-bold px-1.5 py-0.5 rounded focus:bg-[#1c0733] focus:outline-none"
                     />
                   </td>
-
-                  {/* Village */}
                   <td className="py-2.5 px-3">
                     <input
                       type="text"
                       value={r.village}
                       onChange={(e) => handleCellEdit(r.id, 'village', e.target.value)}
-                      className="w-full bg-transparent text-gold-200 font-semibold hover:bg-purple-900/40 px-1.5 py-0.5 rounded focus:bg-[#1c0733] focus:outline-none"
+                      className="w-full bg-transparent text-gold-200 font-semibold px-1.5 py-0.5 rounded focus:bg-[#1c0733] focus:outline-none"
                     />
                   </td>
-
-                  {/* Diary */}
                   <td className="py-2.5 px-3">
                     <input
                       type="text"
                       value={r.diary}
                       onChange={(e) => handleCellEdit(r.id, 'diary', e.target.value)}
-                      className="w-full bg-transparent text-purple-200 hover:bg-purple-900/40 px-1.5 py-0.5 rounded focus:bg-[#1c0733] focus:outline-none text-[11px]"
+                      className="w-full bg-transparent text-purple-200 px-1.5 py-0.5 rounded focus:bg-[#1c0733] focus:outline-none text-[11px]"
                     />
                   </td>
-
-                  {/* Page # */}
                   <td className="py-2.5 px-3">
                     <input
                       type="text"
                       value={r.pageNumber}
                       onChange={(e) => handleCellEdit(r.id, 'pageNumber', e.target.value)}
-                      className="w-full bg-transparent text-gold-300 font-bold hover:bg-purple-900/40 px-1.5 py-0.5 rounded focus:bg-[#1c0733] focus:outline-none text-center"
+                      className="w-full bg-transparent text-gold-300 font-bold px-1.5 py-0.5 rounded focus:bg-[#1c0733] focus:outline-none text-center"
                     />
                   </td>
-
-                  {/* Loan Amount */}
                   <td className="py-2.5 px-3">
                     <input
                       type="number"
                       value={r.loanAmount}
                       onChange={(e) => handleCellEdit(r.id, 'loanAmount', parseFloat(e.target.value) || 0)}
-                      className="w-full bg-transparent text-emerald-400 font-bold hover:bg-purple-900/40 px-1.5 py-0.5 rounded focus:bg-[#1c0733] focus:outline-none font-mono"
+                      className="w-full bg-transparent text-emerald-400 font-bold px-1.5 py-0.5 rounded focus:bg-[#1c0733] focus:outline-none font-mono"
                     />
                   </td>
-
-                  {/* Metal */}
                   <td className="py-2.5 px-3">
                     <select
                       value={r.metal}
                       onChange={(e) => handleCellEdit(r.id, 'metal', e.target.value)}
-                      className="bg-transparent text-white hover:bg-purple-900/40 px-1 py-0.5 rounded focus:bg-[#1c0733] focus:outline-none font-semibold text-[11px]"
+                      className="bg-transparent text-white px-1 py-0.5 rounded focus:bg-[#1c0733] focus:outline-none font-semibold text-[11px]"
                     >
                       <option value="Gold">Gold</option>
                       <option value="Silver">Silver</option>
                     </select>
                   </td>
-
-                  {/* Ornament Category */}
                   <td className="py-2.5 px-3">
                     <input
                       type="text"
                       value={r.category}
                       onChange={(e) => handleCellEdit(r.id, 'category', e.target.value)}
-                      className="w-full bg-transparent text-purple-100 hover:bg-purple-900/40 px-1.5 py-0.5 rounded focus:bg-[#1c0733] focus:outline-none"
+                      className="w-full bg-transparent text-purple-100 px-1.5 py-0.5 rounded focus:bg-[#1c0733] focus:outline-none"
                     />
                   </td>
-
-                  {/* Weight */}
                   <td className="py-2.5 px-3">
                     <input
                       type="number"
                       step="0.1"
                       value={r.weight}
                       onChange={(e) => handleCellEdit(r.id, 'weight', parseFloat(e.target.value) || 0)}
-                      className="w-full bg-transparent text-gold-300 font-bold hover:bg-purple-900/40 px-1.5 py-0.5 rounded focus:bg-[#1c0733] focus:outline-none text-right font-mono"
+                      className="w-full bg-transparent text-gold-300 font-bold px-1.5 py-0.5 rounded focus:bg-[#1c0733] focus:outline-none text-right font-mono"
                     />
                   </td>
-
-                  {/* Quantity */}
                   <td className="py-2.5 px-3">
                     <input
                       type="number"
                       value={r.quantity}
                       onChange={(e) => handleCellEdit(r.id, 'quantity', parseInt(e.target.value, 10) || 1)}
-                      className="w-full bg-transparent text-purple-200 hover:bg-purple-900/40 px-1 py-0.5 rounded focus:bg-[#1c0733] focus:outline-none text-center font-mono text-[11px]"
+                      className="w-full bg-transparent text-purple-200 px-1 py-0.5 rounded focus:bg-[#1c0733] focus:outline-none text-center font-mono text-[11px]"
                     />
                   </td>
-
-                  {/* Mobile */}
                   <td className="py-2.5 px-3">
                     <input
                       type="text"
                       value={r.mobile || ''}
                       placeholder="Optional"
                       onChange={(e) => handleCellEdit(r.id, 'mobile', e.target.value)}
-                      className="w-full bg-transparent text-purple-300/70 hover:bg-purple-900/40 px-1 py-0.5 rounded focus:bg-[#1c0733] focus:outline-none text-[11px]"
+                      className="w-full bg-transparent text-purple-300/70 px-1 py-0.5 rounded focus:bg-[#1c0733] focus:outline-none text-[11px]"
                     />
                   </td>
-
-                  {/* Status Badge */}
                   <td className="py-2.5 px-3 text-center">
                     {r.status === 'VALID' ? (
                       <span className="px-2 py-0.5 rounded-full bg-emerald-950/60 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">
@@ -588,8 +576,6 @@ export const BulkDataInputTab: React.FC<BulkDataInputTabProps> = ({
                       </span>
                     )}
                   </td>
-
-                  {/* Actions */}
                   <td className="py-2.5 px-3 text-center">
                     <button
                       onClick={() => handleDeleteRow(r.id)}
@@ -606,16 +592,16 @@ export const BulkDataInputTab: React.FC<BulkDataInputTabProps> = ({
         </div>
       </div>
 
-      {/* Paste Transcript Modal */}
+      {/* Paste Modal */}
       {showPasteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0a0114]/85 backdrop-blur-md">
           <div className="relative w-full max-w-2xl bg-[#130324] border border-purple-500/20 rounded-3xl p-6 sm:p-8 shadow-modal">
             <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
               <ClipboardPaste className="w-5 h-5 text-gold-400" />
-              <span>Paste 500+ Customer Text / Transcript</span>
+              <span>Paste 500+ Customer Transcript</span>
             </h3>
             <p className="text-xs text-purple-200/70 mb-4">
-              Paste long speech transcripts or numbered customer notes. The engine will instantly split and extract all customer names, villages, page numbers, loans, and ornaments into Excel rows.
+              Paste your long customer notes or recorded transcript. Every entry will be parsed into Excel rows automatically.
             </p>
 
             <textarea
@@ -641,6 +627,58 @@ export const BulkDataInputTab: React.FC<BulkDataInputTabProps> = ({
                 <span>Parse to Table</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* API Key Modal */}
+      {showKeyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0a0114]/85 backdrop-blur-md">
+          <div className="relative w-full max-w-md bg-[#130324] border border-purple-500/20 rounded-3xl p-6 shadow-modal">
+            <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-gold-400" />
+              <span>Whisper AI Speech Key</span>
+            </h3>
+            <p className="text-xs text-purple-200/70 mb-4">
+              Enter your Groq API key (`gsk_...`) or OpenAI API key for lightning-fast, high-accuracy speech transcription of Indian/Gujarati names.
+            </p>
+
+            <form onSubmit={handleSaveApiKey} className="space-y-4">
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="gsk_... or sk-..."
+                className="w-full p-3 rounded-xl bg-[#1c0733] border border-purple-500/20 text-white text-xs font-mono focus:outline-none focus:border-gold-400"
+              />
+
+              <div className="flex items-center justify-between text-[11px] text-purple-300/60">
+                <a
+                  href="https://console.groq.com/keys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-gold-400 hover:underline"
+                >
+                  Get free Groq API key (14,400 free requests/day)
+                </a>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowKeyModal(false)}
+                  className="px-4 py-2 rounded-full text-purple-200/70 hover:text-white text-xs font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-full bg-gold-500 hover:bg-gold-400 text-purple-950 font-bold text-xs shadow-gold-glow transition-all"
+                >
+                  Save Key
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
