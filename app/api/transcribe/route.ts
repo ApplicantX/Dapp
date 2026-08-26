@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Filter out known Whisper hallucination strings (YouTube subtitle artifacts on silence)
+// Filter out known Whisper hallucination strings
 function cleanWhisperTranscript(text: string): string {
   if (!text) return '';
   const hallucinations = [
     /thank you for watching\.?/gi,
     /thanks for watching\.?/gi,
+    /thank you\.?/gi,
+    /thanks\.?/gi,
     /please subscribe\.?/gi,
     /subtitles by.*$/gi,
     /translated by.*$/gi,
     /amara\.org/gi,
     /watching!/gi,
+    /tola,?\s*diary\s*page\.?/gi,
+    /grams,?\s*tola,?\s*diary\s*page\.?/gi,
     /\[music\]/gi,
     /\(music\)/gi,
     /\[silence\]/gi,
@@ -45,15 +49,11 @@ export async function POST(req: NextRequest) {
         : 'https://api.openai.com/v1/audio/transcriptions';
 
       const whisperFormData = new FormData();
-      whisperFormData.append('file', audioFile, 'recording.webm');
+      whisperFormData.append('file', audioFile, 'recording.wav');
       whisperFormData.append('model', isGroq ? 'whisper-large-v3' : 'whisper-1');
       if (language && language !== 'auto') {
         whisperFormData.append('language', language);
       }
-      whisperFormData.append(
-        'prompt',
-        'Dahod jewellery store customer records, Nirvan, Ramesh Patel, Suresh Damor, Vova village, Garbada, Limkheda, Kandora, Kada, Chain, Ring, grams, tola, diary page'
-      );
 
       const response = await fetch(endpoint, {
         method: 'POST',
