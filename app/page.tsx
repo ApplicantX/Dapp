@@ -1,202 +1,101 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { AppData, Customer, Loan, Ornament } from '@/lib/types';
 import {
-  LoanAccount,
-  MarketRates,
-  MetalType,
-  PaymentRecord,
-  StoreSettings,
-  VoiceParseResult,
-} from '@/lib/types';
-import {
-  getStoredLoans,
-  getStoredRates,
-  getStoredSettings,
-  saveLoans,
-  saveRates,
-  saveSettings,
+  getStoredData,
+  saveStoredData,
+  addCustomer,
+  addBatchCustomers,
+  updateCustomer,
+  addLoan,
+  closeLoan,
 } from '@/lib/storage';
-import { Language, translations } from '@/lib/translations';
 import { Navbar } from '@/components/Navbar';
-import { LiveRateBar } from '@/components/LiveRateBar';
-import { DashboardStats } from '@/components/DashboardStats';
-import { LoanList } from '@/components/LoanList';
-import { VoiceAssistantModal } from '@/components/VoiceAssistantModal';
-import { AddLoanModal } from '@/components/AddLoanModal';
-import { PaymentModal } from '@/components/PaymentModal';
-import { GirviReceiptModal } from '@/components/GirviReceiptModal';
-import { CalculatorModal } from '@/components/CalculatorModal';
-import { SettingsModal } from '@/components/SettingsModal';
-import { Mic, PlusCircle, Sparkles, Gem } from 'lucide-react';
-import confetti from 'canvas-confetti';
-import { playSuccessChime, speakFeedback } from '@/lib/speechEngine';
+import { CustomerList } from '@/components/CustomerList';
+import { CustomerDetailView } from '@/components/CustomerDetailView';
+import { CompoundInterestCalculator } from '@/components/CompoundInterestCalculator';
+import { NewCustomerModal } from '@/components/NewCustomerModal';
+import { NewLoanModal } from '@/components/NewLoanModal';
+import { EditDiaryPageModal } from '@/components/EditDiaryPageModal';
+import { ActivityHistoryModal } from '@/components/ActivityHistoryModal';
+import { ExportModal } from '@/components/ExportModal';
+import {
+  Calculator,
+  Users,
+  Gem,
+  Coins,
+  BookOpen,
+  ArrowRight,
+  Sparkles,
+  ShieldCheck,
+} from 'lucide-react';
 
 export default function HomePage() {
-  // Global Data State
-  const [loans, setLoans] = useState<LoanAccount[]>([]);
-  const [rates, setRates] = useState<MarketRates>(getStoredRates());
-  const [settings, setSettings] = useState<StoreSettings>(getStoredSettings());
-  const [language, setLanguage] = useState<Language>('en');
+  const [data, setData] = useState<AppData>(getStoredData());
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Filters & Search
-  const [currentFilter, setCurrentFilter] = useState<'ALL' | 'ACTIVE' | 'OVERDUE' | 'SETTLED'>('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
+  // Navigation State
+  const [currentView, setCurrentView] = useState<'HOME' | 'CUSTOMERS' | 'CALCULATOR'>('HOME');
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
   // Modal States
-  const [isVoiceOpen, setIsVoiceOpen] = useState(false);
-  const [isAddLoanOpen, setIsAddLoanOpen] = useState(false);
-  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
-  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
-  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isNewCustomerOpen, setIsNewCustomerOpen] = useState(false);
+  const [isNewLoanOpen, setIsNewLoanOpen] = useState(false);
+  const [isEditDiaryPageOpen, setIsEditDiaryPageOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
-  // Active item references for modals
-  const [selectedLoanForPayment, setSelectedLoanForPayment] = useState<LoanAccount | null>(null);
-  const [selectedLoanForReceipt, setSelectedLoanForReceipt] = useState<LoanAccount | null>(null);
-  const [editingLoan, setEditingLoan] = useState<LoanAccount | null>(null);
-  const [voiceParsedData, setVoiceParsedData] = useState<VoiceParseResult | null>(null);
-
-  // Load Initial Data from Storage
   useEffect(() => {
-    const loadedLoans = getStoredLoans();
-    const loadedRates = getStoredRates();
-    const loadedSettings = getStoredSettings();
-    setLoans(loadedLoans);
-    setRates(loadedRates);
-    setSettings(loadedSettings);
-    setLanguage(loadedSettings.language || 'en');
+    setData(getStoredData());
     setIsLoaded(true);
   }, []);
 
   const refreshData = () => {
-    setLoans(getStoredLoans());
-    setRates(getStoredRates());
-    setSettings(getStoredSettings());
+    setData(getStoredData());
   };
 
-  const handleLanguageChange = (newLang: Language) => {
-    setLanguage(newLang);
-    const updated = { ...settings, language: newLang };
-    setSettings(updated);
-    saveSettings(updated);
+  // Customer Actions
+  const handleSaveCustomer = (newCust: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const res = addCustomer(data, newCust);
+    setData(res.data);
+    setSelectedCustomer(res.newCustomer);
+    setCurrentView('CUSTOMERS');
   };
 
-  // Save or Update Loan
-  const handleSaveLoan = (savedLoan: LoanAccount) => {
-    setLoans((prev) => {
-      const existingIdx = prev.findIndex((l) => l.id === savedLoan.id);
-      let updated: LoanAccount[];
-      if (existingIdx >= 0) {
-        updated = [...prev];
-        updated[existingIdx] = savedLoan;
-      } else {
-        updated = [savedLoan, ...prev];
-      }
-      saveLoans(updated);
-      return updated;
+  const handleSaveBatchCustomers = (custList: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>[]) => {
+    const updated = addBatchCustomers(data, custList);
+    setData(updated);
+    setCurrentView('CUSTOMERS');
+  };
+
+  const handleSaveDiaryPage = (customerId: string, newDiary: string, newPageNumber: string) => {
+    const updated = updateCustomer(data, customerId, {
+      diary: newDiary,
+      pageNumber: newPageNumber,
     });
-    setEditingLoan(null);
-    setVoiceParsedData(null);
-  };
-
-  // Delete Loan
-  const handleDeleteLoan = (loanId: string) => {
-    if (window.confirm('Are you sure you want to delete this loan record?')) {
-      setLoans((prev) => {
-        const updated = prev.filter((l) => l.id !== loanId);
-        saveLoans(updated);
-        return updated;
+    setData(updated);
+    if (selectedCustomer && selectedCustomer.id === customerId) {
+      setSelectedCustomer({
+        ...selectedCustomer,
+        diary: newDiary,
+        pageNumber: newPageNumber,
       });
     }
   };
 
-  // Record Payment or Settlement
-  const handleSavePayment = (loanId: string, payment: PaymentRecord, settleNow: boolean = false) => {
-    setLoans((prev) => {
-      const updated = prev.map((loan) => {
-        if (loan.id === loanId) {
-          const updatedPayments = [...loan.payments, payment];
-          const newStatus = settleNow ? 'SETTLED' : loan.status;
-          return {
-            ...loan,
-            payments: updatedPayments,
-            status: newStatus,
-            settledDate: settleNow ? new Date().toISOString().split('T')[0] : loan.settledDate,
-            settledAmount: settleNow ? payment.amount : loan.settledAmount,
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return loan;
-      });
-      saveLoans(updated);
-      return updated;
-    });
-  };
-
-  // Settle Loan directly
-  const handleSettleLoan = (loan: LoanAccount) => {
-    setSelectedLoanForPayment(loan);
-    setIsPaymentOpen(true);
-  };
-
-  // Handle Voice Assistant Parsed Result
-  const handleActionParsed = (result: VoiceParseResult) => {
-    if (result.action === 'ADD_LOAN') {
-      setVoiceParsedData(result);
-      setEditingLoan(null);
-      setIsAddLoanOpen(true);
-    } else if (result.action === 'RECORD_PAYMENT') {
-      if (result.customerName) {
-        const match = loans.find((l) =>
-          l.customerName.toLowerCase().includes(result.customerName!.toLowerCase())
-        );
-        if (match) {
-          setSelectedLoanForPayment(match);
-          setIsPaymentOpen(true);
-          return;
-        }
-      }
-      // If customer not matched directly, search for the customer
-      if (result.customerName) {
-        setSearchQuery(result.customerName);
-      }
-    } else if (result.action === 'SEARCH') {
-      if (result.searchQuery) {
-        setSearchQuery(result.searchQuery);
-      }
-    } else if (result.action === 'SHOW_OVERDUE') {
-      setCurrentFilter('OVERDUE');
-    } else if (result.action === 'SHOW_ACTIVE') {
-      setCurrentFilter('ACTIVE');
-    } else if (result.action === 'UPDATE_RATES') {
-      setIsSettingsOpen(true);
-    } else if (result.action === 'CALCULATE') {
-      setIsCalculatorOpen(true);
-    }
-  };
-
-  // Calculator Modal Hand-off to Add Loan
-  const handleApplyCalculationToNewLoan = (
-    metal: MetalType,
-    weight: number,
-    purity: string,
-    safeAmount: number
+  // Loan Actions
+  const handleSaveLoan = (
+    customerId: string,
+    loanData: { loanDate: string; loanAmount: number; ornaments: Ornament[]; notes?: string }
   ) => {
-    setVoiceParsedData({
-      action: 'ADD_LOAN',
-      metal,
-      grossWeight: weight,
-      netWeight: weight,
-      purity,
-      amount: safeAmount,
-      confidence: 1,
-      rawTranscript: 'Calculator Quote',
-      interpretedText: `Creating loan for ${weight}g ${purity} ${metal}`,
-    });
-    setEditingLoan(null);
-    setIsAddLoanOpen(true);
+    const updated = addLoan(data, customerId, loanData);
+    setData(updated);
+  };
+
+  const handleCloseLoan = (loanId: string) => {
+    const updated = closeLoan(data, loanId);
+    setData(updated);
   };
 
   if (!isLoaded) {
@@ -204,138 +103,170 @@ export default function HomePage() {
       <div className="min-h-screen flex items-center justify-center bg-purple-950 text-gold-400">
         <div className="flex flex-col items-center gap-3">
           <Gem className="w-10 h-10 animate-bounce text-gold-400" />
-          <span className="text-xl font-bold font-serif">Loading DAPP...</span>
+          <span className="text-xl font-bold font-serif">Loading Dahod Jewellery Lending...</span>
         </div>
       </div>
     );
   }
 
-  const t = translations[language];
+  // Active Loan & Vault Calculations
+  const activeLoans = data.loans.filter((l) => l.status === 'ACTIVE');
+  let totalActivePrincipal = 0;
+  let totalActiveGoldGrams = 0;
+  let totalActiveSilverGrams = 0;
+
+  activeLoans.forEach((l) => {
+    totalActivePrincipal += l.loanAmount;
+    l.ornaments.forEach((o) => {
+      if (o.metal === 'Gold') totalActiveGoldGrams += o.weight;
+      else totalActiveSilverGrams += o.weight;
+    });
+  });
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Top Live Rates Ticker */}
-      <LiveRateBar
-        rates={rates}
-        language={language}
-        onEditRates={() => setIsSettingsOpen(true)}
-      />
-
-      {/* Main Navbar */}
+    <div className="min-h-screen flex flex-col bg-purple-950 text-white">
+      {/* Navigation Bar */}
       <Navbar
-        settings={settings}
-        language={language}
-        onLanguageChange={handleLanguageChange}
-        onOpenVoiceAssistant={() => setIsVoiceOpen(true)}
-        onOpenAddLoan={() => {
-          setEditingLoan(null);
-          setVoiceParsedData(null);
-          setIsAddLoanOpen(true);
+        currentView={currentView}
+        onNavigate={(view) => {
+          setCurrentView(view);
+          if (view !== 'CUSTOMERS') setSelectedCustomer(null);
         }}
-        onOpenCalculator={() => setIsCalculatorOpen(true)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenExportModal={() => setIsExportModalOpen(true)}
+        onOpenHistoryModal={() => setIsHistoryModalOpen(true)}
       />
 
-      {/* Main Content Area */}
+      {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Luxury Hero Voice Banner for Mom */}
-        <div className="relative overflow-hidden bg-gradient-to-r from-purple-900 via-purple-850 to-purple-950 rounded-3xl p-6 sm:p-8 border-2 border-gold-500/40 shadow-royal mb-6">
-          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="space-y-2 text-center md:text-left">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gold-500/15 border border-gold-500/30 text-gold-300 text-xs font-black uppercase tracking-wider">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Voice-First Jewelry Khata (બોલીને હિસાબ રાખો)</span>
+        {/* VIEW 1: HOME STARTING SCREEN (Section 15: Two Large Options) */}
+        {currentView === 'HOME' && (
+          <div className="space-y-8">
+            {/* Hero Welcome Banner */}
+            <div className="text-center py-6">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gold-500/15 border border-gold-500/30 text-gold-300 text-xs font-black uppercase tracking-wider mb-3">
+                <Sparkles className="w-4 h-4" />
+                <span>Digital Diary & Voice Lending System</span>
               </div>
-              <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-                Welcome, {settings.ownerName || "Mom"}
+              <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight font-serif uppercase">
+                Dahod Jewellery & Gold/Silver Lending
               </h1>
-              <p className="text-sm sm:text-base text-purple-200 font-medium max-w-xl">
-                Just tap the big microphone button to record new gold/silver loans, record interest payments, or search any customer in your voice.
+              <p className="text-sm sm:text-base text-purple-200 font-medium max-w-2xl mx-auto mt-2">
+                Digitized customer physical diary lookup, active gold/silver held ornament records, and jewellery compound interest calculations.
               </p>
             </div>
 
-            {/* Giant Action Button in Hero */}
-            <button
-              onClick={() => setIsVoiceOpen(true)}
-              className="flex-shrink-0 flex items-center gap-3 px-8 py-5 rounded-3xl bg-gradient-to-r from-gold-500 via-gold-400 to-amber-500 hover:from-gold-400 hover:to-gold-300 text-purple-950 font-black text-lg shadow-gold-glow border-2 border-gold-300 transition-all transform hover:scale-105 active:scale-95 group"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-purple-950 flex items-center justify-center text-gold-400 shadow-md group-hover:rotate-12 transition-transform">
-                <Mic className="w-7 h-7" />
+            {/* TWO LARGE OPTIONS (Section 15 of Requirements) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+              {/* Option 1: Compound Interest Calculator */}
+              <div
+                onClick={() => setCurrentView('CALCULATOR')}
+                className="cursor-pointer group bg-gradient-to-br from-purple-900 via-purple-850 to-purple-950 p-8 sm:p-10 rounded-3xl border-2 border-gold-500/40 hover:border-gold-400 shadow-royal hover:scale-[1.02] transition-all flex flex-col justify-between"
+              >
+                <div>
+                  <div className="w-16 h-16 rounded-2xl bg-gold-500/20 border-2 border-gold-400/60 flex items-center justify-center text-gold-300 mb-6 group-hover:rotate-6 transition-transform shadow-gold-glow">
+                    <Calculator className="w-9 h-9" />
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-black text-white group-hover:text-gold-300 transition-colors">
+                    Compound Interest Calculator
+                  </h2>
+                  <p className="text-sm sm:text-base text-purple-200 mt-2 font-medium">
+                    Independent tool for jewellery loan calculations with annual compounding. Calculate 1 to 20 items with custom rates and start/end dates.
+                  </p>
+                </div>
+
+                <div className="mt-8 flex items-center gap-2 text-gold-400 font-extrabold text-sm sm:text-base">
+                  <span>Open Calculator (વ્યાજ ગણતરી)</span>
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1.5 transition-transform" />
+                </div>
               </div>
-              <div className="text-left">
-                <span className="text-xs uppercase tracking-widest text-purple-900 font-extrabold block">
-                  One-Tap Voice
+
+              {/* Option 2: Customer Details */}
+              <div
+                onClick={() => {
+                  setSelectedCustomer(null);
+                  setCurrentView('CUSTOMERS');
+                }}
+                className="cursor-pointer group bg-gradient-to-br from-purple-900 via-purple-850 to-purple-950 p-8 sm:p-10 rounded-3xl border-2 border-gold-500/40 hover:border-gold-400 shadow-royal hover:scale-[1.02] transition-all flex flex-col justify-between"
+              >
+                <div>
+                  <div className="w-16 h-16 rounded-2xl bg-gold-500/20 border-2 border-gold-400/60 flex items-center justify-center text-gold-300 mb-6 group-hover:rotate-6 transition-transform shadow-gold-glow">
+                    <Users className="w-9 h-9" />
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-black text-white group-hover:text-gold-300 transition-colors">
+                    Customer Details (ગ્રાહક ખાતાવહી)
+                  </h2>
+                  <p className="text-sm sm:text-base text-purple-200 mt-2 font-medium">
+                    Search customer names and villages, view physical diary & page numbers, active held ornaments, loan history, and speak new loans.
+                  </p>
+                </div>
+
+                <div className="mt-8 flex items-center gap-2 text-gold-400 font-extrabold text-sm sm:text-base">
+                  <span>Open Customer Records ({data.customers.length} Accounts)</span>
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1.5 transition-transform" />
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Vault & Operational Summary */}
+            <div className="max-w-5xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4">
+              <div className="bg-purple-900/60 p-4 rounded-2xl border border-purple-800">
+                <span className="text-xs text-purple-300 font-bold block">Total Customers</span>
+                <span className="text-2xl font-black text-white">{data.customers.length}</span>
+              </div>
+              <div className="bg-purple-900/60 p-4 rounded-2xl border border-purple-800">
+                <span className="text-xs text-purple-300 font-bold block">Active Loans Total</span>
+                <span className="text-2xl font-black text-emerald-300">
+                  ₹{totalActivePrincipal.toLocaleString('en-IN')}
                 </span>
-                <span className="text-xl font-black">{t.tapToSpeak}</span>
               </div>
-            </button>
-          </div>
-        </div>
-
-        {/* Dashboard Financial & Vault Stats */}
-        <DashboardStats
-          loans={loans}
-          rates={rates}
-          language={language}
-          onFilterChange={(flt) => setCurrentFilter(flt)}
-        />
-
-        {/* Girvi Loan Book / Customer Ledger */}
-        <div className="mt-8">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
-                <Gem className="w-6 h-6 text-gold-400" />
-                <span>{t.girviKhata} (ગિરવે ખાતાવહી)</span>
-              </h2>
-              <p className="text-xs text-purple-300 font-medium mt-0.5">
-                Complete records of all gold & silver customer loan accounts and accrued interest.
-              </p>
+              <div className="bg-purple-900/60 p-4 rounded-2xl border border-purple-800">
+                <span className="text-xs text-gold-300 font-bold block">Gold in Vault</span>
+                <span className="text-2xl font-black text-gold-300">
+                  {totalActiveGoldGrams.toFixed(1)}g
+                </span>
+              </div>
+              <div className="bg-purple-900/60 p-4 rounded-2xl border border-purple-800">
+                <span className="text-xs text-slate-300 font-bold block">Silver in Vault</span>
+                <span className="text-2xl font-black text-slate-200">
+                  {totalActiveSilverGrams >= 1000
+                    ? `${(totalActiveSilverGrams / 1000).toFixed(2)} kg`
+                    : `${totalActiveSilverGrams.toFixed(0)}g`}
+                </span>
+              </div>
             </div>
-
-            <button
-              onClick={() => {
-                setEditingLoan(null);
-                setVoiceParsedData(null);
-                setIsAddLoanOpen(true);
-              }}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gold-500 hover:bg-gold-400 text-purple-950 font-black text-sm shadow-gold-glow transition-all active:scale-95"
-            >
-              <PlusCircle className="w-4 h-4" />
-              <span>{t.addLoan}</span>
-            </button>
           </div>
+        )}
 
-          <LoanList
-            loans={loans}
-            rates={rates}
-            language={language}
-            currentFilter={currentFilter}
-            onFilterChange={setCurrentFilter}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            onOpenAddLoan={() => {
-              setEditingLoan(null);
-              setVoiceParsedData(null);
-              setIsAddLoanOpen(true);
-            }}
-            onRecordPayment={(loan) => {
-              setSelectedLoanForPayment(loan);
-              setIsPaymentOpen(true);
-            }}
-            onViewReceipt={(loan) => {
-              setSelectedLoanForReceipt(loan);
-              setIsReceiptOpen(true);
-            }}
-            onSettleLoan={handleSettleLoan}
-            onEditLoan={(loan) => {
-              setEditingLoan(loan);
-              setVoiceParsedData(null);
-              setIsAddLoanOpen(true);
-            }}
-            onDeleteLoan={handleDeleteLoan}
+        {/* VIEW 2: CUSTOMER MANAGEMENT FLOW */}
+        {currentView === 'CUSTOMERS' && (
+          <div>
+            {selectedCustomer ? (
+              <CustomerDetailView
+                customer={selectedCustomer}
+                loans={data.loans}
+                onBack={() => setSelectedCustomer(null)}
+                onOpenNewLoanModal={() => setIsNewLoanOpen(true)}
+                onCloseLoan={handleCloseLoan}
+                onEditDiaryPage={() => setIsEditDiaryPageOpen(true)}
+              />
+            ) : (
+              <CustomerList
+                customers={data.customers}
+                loans={data.loans}
+                onSelectCustomer={(cust) => setSelectedCustomer(cust)}
+                onOpenNewCustomerModal={() => setIsNewCustomerOpen(true)}
+              />
+            )}
+          </div>
+        )}
+
+        {/* VIEW 3: COMPOUND INTEREST CALCULATOR FLOW */}
+        {currentView === 'CALCULATOR' && (
+          <CompoundInterestCalculator
+            defaultRate={data.defaultAnnualInterestRate || 18.0}
+            onBackToHome={() => setCurrentView('HOME')}
           />
-        </div>
+        )}
       </main>
 
       {/* Footer */}
@@ -343,89 +274,59 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-gold-400 font-bold">
             <Gem className="w-4 h-4" />
-            <span>{settings.storeName}</span>
+            <span>Dahod Jewellery & Gold/Silver Lending</span>
           </div>
           <p className="text-purple-400">
-            DAPP • Luxury Voice-First Gold & Silver Loan Management • Built with ❤️ for Mom
+            Internal Family Lending Record • Physical Diary Remains Legal Source of Truth
           </p>
-          <div className="flex items-center gap-3 text-purple-300">
-            <span>GST: {settings.gstNumber || '24AAAAA0000A1Z5'}</span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsExportModalOpen(true)}
+              className="text-gold-400 hover:underline font-bold"
+            >
+              Export Excel & Backup
+            </button>
           </div>
         </div>
       </footer>
 
       {/* Modals */}
-      <VoiceAssistantModal
-        isOpen={isVoiceOpen}
-        onClose={() => setIsVoiceOpen(false)}
-        settings={settings}
-        language={language}
-        onActionParsed={handleActionParsed}
+      <NewCustomerModal
+        isOpen={isNewCustomerOpen}
+        onClose={() => setIsNewCustomerOpen(false)}
+        villages={data.villages}
+        diaries={data.diaries}
+        onSaveCustomer={handleSaveCustomer}
+        onSaveBatchCustomers={handleSaveBatchCustomers}
       />
 
-      <AddLoanModal
-        isOpen={isAddLoanOpen}
-        onClose={() => {
-          setIsAddLoanOpen(false);
-          setEditingLoan(null);
-          setVoiceParsedData(null);
-        }}
-        existingLoans={loans}
-        rates={rates}
-        settings={settings}
-        language={language}
-        initialVoiceData={voiceParsedData}
-        editingLoan={editingLoan}
+      <NewLoanModal
+        isOpen={isNewLoanOpen}
+        onClose={() => setIsNewLoanOpen(false)}
+        customer={selectedCustomer}
+        categories={data.ornamentCategories}
         onSaveLoan={handleSaveLoan}
       />
 
-      <PaymentModal
-        isOpen={isPaymentOpen}
-        onClose={() => {
-          setIsPaymentOpen(false);
-          setSelectedLoanForPayment(null);
-        }}
-        loan={selectedLoanForPayment}
-        settings={settings}
-        language={language}
-        onSavePayment={handleSavePayment}
+      <EditDiaryPageModal
+        isOpen={isEditDiaryPageOpen}
+        onClose={() => setIsEditDiaryPageOpen(false)}
+        customer={selectedCustomer}
+        diaries={data.diaries}
+        onSaveDiaryPage={handleSaveDiaryPage}
       />
 
-      <GirviReceiptModal
-        isOpen={isReceiptOpen}
-        onClose={() => {
-          setIsReceiptOpen(false);
-          setSelectedLoanForReceipt(null);
-        }}
-        loan={selectedLoanForReceipt}
-        settings={settings}
-        language={language}
+      <ActivityHistoryModal
+        isOpen={isHistoryModalOpen}
+        onClose={() => setIsHistoryModalOpen(false)}
+        logs={data.activityLogs}
       />
 
-      <CalculatorModal
-        isOpen={isCalculatorOpen}
-        onClose={() => setIsCalculatorOpen(false)}
-        rates={rates}
-        settings={settings}
-        language={language}
-        onApplyToNewLoan={handleApplyCalculationToNewLoan}
-      />
-
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        settings={settings}
-        rates={rates}
-        language={language}
-        onSaveSettings={(newSettings) => {
-          setSettings(newSettings);
-          saveSettings(newSettings);
-        }}
-        onSaveRates={(newRates) => {
-          setRates(newRates);
-          saveRates(newRates);
-        }}
-        onRefreshData={refreshData}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        data={data}
+        onDataRestored={refreshData}
       />
     </div>
   );

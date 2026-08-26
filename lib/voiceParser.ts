@@ -1,19 +1,17 @@
-import { MetalType, OrnamentType, VoiceAction, VoiceParseResult } from './types';
+import { MetalType, ParsedCustomerVoice, ParsedLoanVoice } from './types';
 
-// Helper to convert spoken number words (English, Hindi, Gujarati) into numbers
+// Helper to convert spoken number words into integers
 export function parseSpokenNumber(text: string): number | null {
   const clean = text.toLowerCase().replace(/,/g, '').trim();
 
-  // Direct digits like "50000", "50000.50"
+  // Direct digits like "50000", "50000.50", "142", "2026"
   const directMatch = clean.match(/(\d+(\.\d+)?)/);
   if (directMatch) {
     let num = parseFloat(directMatch[1]);
-    if (clean.includes('lakh') || clean.includes('lac') || clean.includes('लाख') || clean.includes('લાખ')) {
+    if (clean.includes('lakh') || clean.includes('lac') || clean.includes('લાખ') || clean.includes('लाख')) {
       num *= 100000;
-    } else if (clean.includes('thousand') || clean.includes('k') || clean.includes('हज़ार') || clean.includes('હજાર')) {
+    } else if (clean.includes('thousand') || clean.includes('k') || clean.includes('હજાર') || clean.includes('हज़ार')) {
       num *= 1000;
-    } else if (clean.includes('crore') || clean.includes('करोड़') || clean.includes('કરોડ')) {
-      num *= 10000000;
     }
     return Math.round(num * 100) / 100;
   }
@@ -25,17 +23,16 @@ export function parseSpokenNumber(text: string): number | null {
     'twenty': 20, 'thirty': 30, 'forty': 40, 'fifty': 50,
     'sixty': 60, 'seventy': 70, 'eighty': 80, 'ninety': 90,
     'hundred': 100, 'thousand': 1000, 'lakh': 100000, 'lac': 100000,
-    'पचास': 50, 'साठ': 60, 'सत्तर': 70, 'अस्सी': 80, 'नब्बे': 90, 'सौ': 100,
-    'हज़ार': 1000, 'लाख': 100000, 'डेढ़': 1.5, 'ढाई': 2.5, 'દોઢ': 1.5, 'અઢી': 2.5,
-    'પચાસ': 50, 'સાઠ': 60, 'સિત્તેર': 70, 'એંસી': 80, 'નેવું': 90, 'સો': 100, 'હજાર': 1000,
+    'પચાસ': 50, 'સાઠ': 60, 'સિત્તેર': 70, 'એંસી': 80, 'નેવું': 90, 'સો': 100, 'હજાર': 1000, 'લાખ': 100000,
+    'पचास': 50, 'साठ': 60, 'सत्तर': 70, 'अस्सी': 80, 'नब्बे': 90, 'सौ': 100, 'हज़ार': 1000, 'लाख': 100000,
   };
 
   for (const [w, val] of Object.entries(wordsMap)) {
     if (clean.includes(w)) {
-      if (clean.includes('thousand') || clean.includes('हज़ार') || clean.includes('હજાર')) {
+      if (clean.includes('thousand') || clean.includes('હજાર') || clean.includes('हज़ार')) {
         return val < 1000 ? val * 1000 : val;
       }
-      if (clean.includes('lakh') || clean.includes('लाख') || clean.includes('લાખ')) {
+      if (clean.includes('lakh') || clean.includes('લાખ') || clean.includes('લાખ')) {
         return val < 100000 ? val * 100000 : val;
       }
       return val;
@@ -45,348 +42,329 @@ export function parseSpokenNumber(text: string): number | null {
   return null;
 }
 
-export function parseVoiceInput(rawTranscript: string): VoiceParseResult {
-  const text = rawTranscript.toLowerCase().trim();
-  const result: VoiceParseResult = {
-    action: 'UNKNOWN',
-    confidence: 0.5,
-    rawTranscript,
-    interpretedText: '',
+// 1. Single Customer Voice Parsing
+// Example input: "Ramesh Mishra from Vova village, Diary 2026, Page 142, mobile 9825123456"
+export function parseSingleCustomerVoice(rawText: string, knownVillages: string[] = []): ParsedCustomerVoice {
+  const text = rawText.trim();
+  const lower = text.toLowerCase();
+
+  let name = '';
+  let village = '';
+  let diary = 'Diary 2026';
+  let pageNumber = '';
+  let mobile: string | undefined = undefined;
+
+  // Extract Mobile number
+  const mobileMatch = text.match(/(?:\+91|0)?[6-9]\d{9}/);
+  if (mobileMatch) {
+    mobile = mobileMatch[0];
+  }
+
+  // Extract Diary: e.g. "Diary 2026", "Diary 2025", "Diary Red 1", "ચોપડો 2026"
+  const diaryMatch = text.match(/(?:diary|ચોપડો|ડાયરી|book)\s*([A-Za-z0-9\-_]+(?:\s+[A-Za-z0-9]+)?)/i);
+  if (diaryMatch) {
+    const dVal = diaryMatch[1].trim();
+    diary = dVal.toLowerCase().startsWith('diary') ? dVal : `Diary ${dVal}`;
+  } else {
+    // Check if a 4-digit year like 2024, 2025, 2026 is mentioned
+    const yearMatch = text.match(/\b(202[4-9])\b/);
+    if (yearMatch) {
+      diary = `Diary ${yearMatch[1]}`;
+    }
+  }
+
+  // Extract Page Number: e.g. "Page 142", "Page number 142", "પાના નંબર 142", "પાનું 142"
+  const pageMatch = text.match(/(?:page|page number|p\.|પાના નંબર|પાનું|પેજ|पृष्ठ|पन्ना)\s*(?:no\.?|number)?\s*(\d+)/i);
+  if (pageMatch) {
+    pageNumber = pageMatch[1];
+  } else {
+    // If there's a standalone number that is not mobile, not year
+    const numMatches = text.match(/\b\d{1,4}\b/g);
+    if (numMatches) {
+      const candidates = numMatches.filter((n) => !diary.includes(n) && (!mobile || !mobile.includes(n)));
+      if (candidates.length > 0) {
+        pageNumber = candidates[candidates.length - 1];
+      }
+    }
+  }
+
+  // Extract Village: check against knownVillages or "from X village", "X gaam", "ગામ X"
+  const villagePatterns = [
+    /(?:from|resident of|village|at|ગામ|રહેવાસી|વાળા|ગાંવ)\s+([A-Za-z\u0A80-\u0AFF\u0900-\u097F]+(?:\s+[A-Za-z\u0A80-\u0AFF\u0900-\u097F]+)?)/i,
+    /([A-Za-z\u0A80-\u0AFF\u0900-\u097F]+)\s+(?:village|gaam|ગામ|ગાંવ)/i,
+  ];
+
+  for (const pat of villagePatterns) {
+    const vMatch = text.match(pat);
+    if (vMatch && vMatch[1]) {
+      const candidate = vMatch[1].trim();
+      const ignoredWords = ['diary', 'page', 'mobile', 'phone', 'customer', 'new', 'add', 'no', 'number'];
+      if (!ignoredWords.includes(candidate.toLowerCase())) {
+        village = candidate.charAt(0).toUpperCase() + candidate.slice(1);
+        break;
+      }
+    }
+  }
+
+  if (!village && knownVillages.length > 0) {
+    for (const v of knownVillages) {
+      if (lower.includes(v.toLowerCase())) {
+        village = v;
+        break;
+      }
+    }
+  }
+
+  // Extract Customer Name: Look before "from", "village", "diary", "page", or start of text
+  let nameText = text;
+  if (village) {
+    const vIdx = nameText.toLowerCase().indexOf(village.toLowerCase());
+    if (vIdx > 0) {
+      nameText = nameText.substring(0, vIdx);
+    }
+  }
+  const markers = ['from', 'village', 'diary', 'page', 'mobile', 'ગામ', 'ચોપડો', 'પાના', 'ડાયરી'];
+  for (const m of markers) {
+    const mIdx = nameText.toLowerCase().indexOf(m);
+    if (mIdx > 0) {
+      nameText = nameText.substring(0, mIdx);
+    }
+  }
+
+  // Clean up name
+  name = nameText
+    .replace(/(?:customer|new customer|add customer|name is|શ્રી|નામ)/gi, '')
+    .replace(/[^A-Za-z\u0A80-\u0AFF\u0900-\u097F\s]/g, '')
+    .trim();
+
+  // Capitalize name
+  if (name) {
+    name = name
+      .split(/\s+/)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  }
+
+  return {
+    name: name || 'Unknown Customer',
+    village: village || 'Dahod',
+    diary: diary || 'Diary 2026',
+    pageNumber: pageNumber || '1',
+    mobile,
+    rawText,
+  };
+}
+
+// 2. Bulk Customer Voice Parsing (Section 10)
+// Example input: "1. Ramesh Patel from Vova village Diary 2026 Page 12, 2. Suresh Damor from Garbada Diary 2025 Page 84, 3. Bharat Bhabhor from Limkheda Diary 2026 Page 55"
+export function parseBulkCustomersVoice(rawText: string, knownVillages: string[] = []): ParsedCustomerVoice[] {
+  const text = rawText.trim();
+
+  // Split by numbered items e.g. "1.", "2.", "Customer 1:", "Next customer:", "and next"
+  let segments = text.split(/(?:\b\d+[\.\)]|\bCustomer\s*\d+:?|\bનંબર\s*\d+:?|\bnumber\s*\d+:?|\bnext\s*customer:?|\band\s+next:?)/i);
+
+  // If no numbered split found, try splitting by semicolon, newline, or "and then"
+  if (segments.length <= 1) {
+    const newline = String.fromCharCode(10);
+    segments = text.split(new RegExp('(?:;|' + newline + '|\band\s+then\b|\band\s+also\b)', 'i'));
+  }
+
+  const cleanedSegments = segments
+    .map((s) => s.trim())
+    .filter((s) => s.length > 5);
+
+  if (cleanedSegments.length === 0) {
+    return [parseSingleCustomerVoice(rawText, knownVillages)];
+  }
+
+  return cleanedSegments.map((seg) => parseSingleCustomerVoice(seg, knownVillages));
+}
+
+// 3. Loan Voice Parsing with Multiple Ornaments (Section 8 & 12)
+// Example input: "Add 500 grams silver kandora and 200 grams silver kada for a total loan amount of fifty thousand rupees on 12 August"
+export function parseLoanVoice(rawText: string, knownCategories: string[] = []): ParsedLoanVoice {
+  const text = rawText.trim();
+  const lower = text.toLowerCase();
+
+  // 1. Extract Total Loan Amount
+  let loanAmount = 0;
+  const amountMatches = [
+    /(?:loan amount|total loan|loan of|amount of|total|રૂપિયા|रुपये|loan)\s*(?:is|of|for)?\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:lakh|thousand|k|lac|rupees|rs|રૂપિયા|रुपये)?/i,
+    /(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:lakh|lac|thousand|k|rupees|rs|રૂપિયા|रुपये)\s*(?:loan|total|amount)/i,
+    /(?:fifty|forty|thirty|twenty|ten|sixty|seventy|eighty|ninety|hundred|thousand|lakh|पचास|साठ|લાખ|હજાર)\s*(?:thousand|lakh|rupees|rs|રૂપિયા|रुपये)?/i,
+  ];
+
+  for (const pat of amountMatches) {
+    const m = text.match(pat);
+    if (m) {
+      const parsed = parseSpokenNumber(m[0]);
+      if (parsed && parsed >= 500) {
+        loanAmount = parsed;
+        break;
+      }
+    }
+  }
+
+  if (!loanAmount) {
+    // Check highest standalone number >= 1000
+    const nums = text.match(/\b\d{4,7}\b/g);
+    if (nums && nums.length > 0) {
+      loanAmount = parseInt(nums[0], 10);
+    } else {
+      loanAmount = 50000; // default fallback
+    }
+  }
+
+  // 2. Extract Date (or default today)
+  let loanDate = new Date().toISOString().split('T')[0];
+  const dateMatch = text.match(/\b(\d{1,2})\s*(?:st|nd|rd|th)?\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)\b/i);
+  if (dateMatch) {
+    const day = dateMatch[1].padStart(2, '0');
+    const monthStr = dateMatch[2].toLowerCase();
+    const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    const monthIndex = months.findIndex((m) => monthStr.startsWith(m));
+    if (monthIndex >= 0) {
+      const mNum = (monthIndex + 1).toString().padStart(2, '0');
+      const year = new Date().getFullYear();
+      loanDate = `${year}-${mNum}-${day}`;
+    }
+  }
+
+  // 3. Extract Multiple Ornaments
+  // Split phrases by "and", "plus", ",", "સાથે", "તથા", "અને", "aur"
+  const ornamentSegments = text.split(/(?:\band\b|\bplus\b|\balso\b|,|અને|તથા|સાથે|और)/i);
+  const ornaments: { metal: MetalType; category: string; weight: number; quantity: number }[] = [];
+
+  const categoryKeywords: Record<string, string> = {
+    'kandora': 'Kandora',
+    'kandoro': 'Kandora',
+    'કંદોરો': 'Kandora',
+    'કંદોરા': 'Kandora',
+    'कंदोरा': 'Kandora',
+    'kada': 'Kada',
+    'kadas': 'Kada',
+    'કડા': 'Kada',
+    'કડો': 'Kada',
+    'कड़ा': 'Kada',
+    'chain': 'Chain',
+    'ચેઇન': 'Chain',
+    'દોરો': 'Chain',
+    'चेन': 'Chain',
+    'ring': 'Ring',
+    'viti': 'Ring',
+    'વીંટી': 'Ring',
+    'अंगूठी': 'Ring',
+    'necklace': 'Necklace',
+    'haar': 'Necklace',
+    'હાર': 'Necklace',
+    'हार': 'Necklace',
+    'mangalsutra': 'Mangalsutra',
+    'મંગળસૂત્ર': 'Mangalsutra',
+    'मंगलसूत्र': 'Mangalsutra',
+    'earring': 'Earrings',
+    'earrings': 'Earrings',
+    'jhumki': 'Earrings',
+    'jhumka': 'Earrings',
+    'butti': 'Earrings',
+    'ઝૂમખી': 'Earrings',
+    'ઝૂમખા': 'Earrings',
+    'બુટ્ટી': 'Earrings',
+    'झुमके': 'Earrings',
+    'bangle': 'Bangle',
+    'bangles': 'Bangle',
+    'kangan': 'Bangle',
+    'chudi': 'Bangle',
+    'બંગડી': 'Bangle',
+    'ચૂડી': 'Bangle',
+    'चूड़ी': 'Bangle',
+    'anklet': 'Anklet / Payal',
+    'payal': 'Anklet / Payal',
+    'jhanjhar': 'Anklet / Payal',
+    'toda': 'Anklet / Payal',
+    'ઝાઝર': 'Anklet / Payal',
+    'પાયલ': 'Anklet / Payal',
+    'તોડા': 'Anklet / Payal',
+    'पायल': 'Anklet / Payal',
+    'utensils': 'Utensils',
+    'thali': 'Utensils',
+    'bartan': 'Utensils',
+    'vasan': 'Utensils',
+    'વાસણ': 'Utensils',
+    'થાલી': 'Utensils',
+    'बर्तन': 'Utensils',
+    'coin': 'Coin / Bar',
+    'bar': 'Coin / Bar',
+    'lagdi': 'Coin / Bar',
+    'ginni': 'Coin / Bar',
+    'સિક્કો': 'Coin / Bar',
+    'લગડી': 'Coin / Bar',
   };
 
-  // 1. Detect Action
-  const isAddLoan =
-    text.includes('add loan') ||
-    text.includes('new loan') ||
-    text.includes('create loan') ||
-    text.includes('give loan') ||
-    text.includes('lend') ||
-    text.includes('loan of') ||
-    text.includes('loan for') ||
-    text.includes('girvi') ||
-    text.includes('गिरवी') ||
-    text.includes('गहना') ||
-    text.includes('ગિરવે') ||
-    text.includes('ગીરવી') ||
-    text.includes('નવું ખાતું') ||
-    text.includes('ખાતું બનાવો') ||
-    text.includes('લોન આપો') ||
-    text.includes('લોન આપ્યા');
+  for (const seg of ornamentSegments) {
+    const sLower = seg.toLowerCase();
 
-  const isPayment =
-    text.includes('record interest') ||
-    text.includes('pay interest') ||
-    text.includes('collect interest') ||
-    text.includes('interest of') ||
-    text.includes('received payment') ||
-    text.includes('payment of') ||
-    text.includes('ब्याज जमा') ||
-    text.includes('जमा करो') ||
-    text.includes('વ્યાજ જમા') ||
-    text.includes('રકમ જમા');
-
-  const isSearch =
-    text.includes('search') ||
-    text.includes('find customer') ||
-    text.includes('find') ||
-    text.includes('look for') ||
-    text.includes('show customer') ||
-    text.includes('open customer') ||
-    text.includes('શોધો') ||
-    text.includes('ખોલો') ||
-    text.includes('ढूंढो');
-
-  const isOverdue =
-    text.includes('show overdue') ||
-    text.includes('overdue loans') ||
-    text.includes('pending loans') ||
-    text.includes('alerts') ||
-    text.includes('બાકી ખાતા') ||
-    text.includes('मुदDAT');
-
-  const isCalculator =
-    text.includes('calculate') ||
-    text.includes('calculator') ||
-    text.includes('how much loan') ||
-    text.includes('gold value') ||
-    text.includes('ગણતરી') ||
-    text.includes('हिसाब');
-
-  const isRateCheck =
-    text.includes('gold rate') ||
-    text.includes('silver rate') ||
-    text.includes('rate today') ||
-    text.includes('what is the price') ||
-    text.includes('સોનાનો ભાવ') ||
-    text.includes('चांदी का भाव');
-
-  if (isAddLoan) {
-    result.action = 'ADD_LOAN';
-    result.confidence = 0.9;
-  } else if (isPayment) {
-    result.action = 'RECORD_PAYMENT';
-    result.confidence = 0.88;
-  } else if (isSearch) {
-    result.action = 'SEARCH';
-    result.confidence = 0.85;
-  } else if (isOverdue) {
-    result.action = 'SHOW_OVERDUE';
-    result.confidence = 0.85;
-  } else if (isRateCheck) {
-    result.action = 'UPDATE_RATES';
-    result.confidence = 0.85;
-  } else if (isCalculator) {
-    result.action = 'CALCULATE';
-    result.confidence = 0.8;
-  } else if (text.length > 3) {
-    // If just a name or general input, treat as search or potential loan
-    result.action = 'SEARCH';
-    result.searchQuery = rawTranscript.trim();
-    result.confidence = 0.6;
-  }
-
-  // 2. Extract Metal Type
-  if (text.includes('silver') || text.includes('chandi') || text.includes('ચાંદી') || text.includes('चांदी')) {
-    result.metal = 'SILVER';
-  } else if (
-    text.includes('gold') ||
-    text.includes('sona') ||
-    text.includes('સોનું') ||
-    text.includes('સોના') ||
-    text.includes('सोना') ||
-    text.includes('सोने') ||
-    text.includes('22k') ||
-    text.includes('24k') ||
-    text.includes('916')
-  ) {
-    result.metal = 'GOLD';
-  } else {
-    // Default to Gold for jewelry store loans
-    result.metal = 'GOLD';
-  }
-
-  // 3. Extract Ornament / Item Type
-  if (text.includes('chain') || text.includes('ચેઇન') || text.includes('चेन') || text.includes('દોરો')) {
-    result.itemType = 'CHAIN';
-    result.itemDescription = 'Gold Chain';
-  } else if (
-    text.includes('bangle') ||
-    text.includes('bangles') ||
-    text.includes('kada') ||
-    text.includes('kangan') ||
-    text.includes('કાંગણ') ||
-    text.includes('કડા') ||
-    text.includes('चूड़ी') ||
-    text.includes('कंगन')
-  ) {
-    result.itemType = 'BANGLE';
-    result.itemDescription = 'Gold Bangles / Kada Pair';
-  } else if (
-    text.includes('ring') ||
-    text.includes('anguthi') ||
-    text.includes('viti') ||
-    text.includes('વીંટી') ||
-    text.includes('અંગૂઠી') ||
-    text.includes('अंगूठी')
-  ) {
-    result.itemType = 'RING';
-    result.itemDescription = 'Ring';
-  } else if (
-    text.includes('necklace') ||
-    text.includes('haar') ||
-    text.includes('choker') ||
-    text.includes('હાર') ||
-    text.includes('हार') ||
-    text.includes('सेट')
-  ) {
-    result.itemType = 'NECKLACE';
-    result.itemDescription = 'Necklace Set';
-  } else if (
-    text.includes('earring') ||
-    text.includes('earrings') ||
-    text.includes('jhumka') ||
-    text.includes('butti') ||
-    text.includes('ઝૂમખા') ||
-    text.includes('બુટ્ટી') ||
-    text.includes('झुमके') ||
-    text.includes('बाली')
-  ) {
-    result.itemType = 'EARRINGS';
-    result.itemDescription = 'Earrings / Jhumka';
-  } else if (
-    text.includes('mangalsutra') ||
-    text.includes('tanmaniya') ||
-    text.includes('મંગળસૂત્ર') ||
-    text.includes('मंगलसूत्र')
-  ) {
-    result.itemType = 'MANGALSUTRA';
-    result.itemDescription = 'Mangalsutra';
-  } else if (
-    text.includes('coin') ||
-    text.includes('ginni') ||
-    text.includes('bar') ||
-    text.includes('lagdi') ||
-    text.includes('સિક્કો') ||
-    text.includes('લગડી') ||
-    text.includes('सिक्का') ||
-    text.includes('पासा')
-  ) {
-    result.itemType = 'COIN';
-    result.itemDescription = 'Coin / Bullion';
-  } else if (
-    text.includes('thali') ||
-    text.includes('utensil') ||
-    text.includes('utensils') ||
-    text.includes('bartan') ||
-    text.includes('vasan') ||
-    text.includes('વાસણ') ||
-    text.includes('થાલી') ||
-    text.includes('बर्तन') ||
-    text.includes('थाली')
-  ) {
-    result.itemType = 'UTENSILS';
-    result.itemDescription = 'Silver Utensils Set';
-  } else if (
-    text.includes('anklet') ||
-    text.includes('payal') ||
-    text.includes('jhanjhar') ||
-    text.includes('ઝાઝર') ||
-    text.includes('પાયલ') ||
-    text.includes('पायल')
-  ) {
-    result.itemType = 'ANKLET';
-    result.itemDescription = 'Silver Anklet / Payal';
-  } else {
-    result.itemType = 'OTHER';
-    result.itemDescription = result.metal === 'GOLD' ? 'Gold Ornament' : 'Silver Item';
-  }
-
-  // 4. Extract Weight (in grams or tola)
-  // e.g. "20 gram", "24.5g", "2 tola", "15.2 grams", "20 ग्राम", "૨૦ ગ્રામ"
-  const weightMatch = text.match(/(\d+(\.\d+)?)\s*(gram|grams|gm|gms|g|tola|tole|ગ્રામ|તોલા|ग्राम|तोला)/i);
-  if (weightMatch) {
-    let w = parseFloat(weightMatch[1]);
-    const unit = weightMatch[3].toLowerCase();
-    if (unit.includes('tola') || unit.includes('તોલા') || unit.includes('तोला')) {
-      w = w * 11.664; // standard tola in grams
+    // Check if segment mentions weight
+    const wtMatch = seg.match(/(\d+(\.\d+)?)\s*(gram|grams|gm|gms|g|tola|tole|ગ્રામ|તોલા|ग्राम|तोला)/i);
+    let weight = 0;
+    if (wtMatch) {
+      weight = parseFloat(wtMatch[1]);
+      if (wtMatch[3].toLowerCase().includes('tola') || wtMatch[3].includes('તોલા') || wtMatch[3].includes('तोला')) {
+        weight = weight * 11.664;
+      }
+      weight = Math.round(weight * 10) / 10;
     }
-    result.grossWeight = Math.round(w * 10) / 10;
-    result.netWeight = result.grossWeight;
-  }
 
-  // 5. Extract Purity
-  if (text.includes('24k') || text.includes('24 carat') || text.includes('૨૪ કેરેટ') || text.includes('24 कैरेट') || text.includes('pure')) {
-    result.purity = '24K';
-  } else if (text.includes('18k') || text.includes('18 carat') || text.includes('૧૮ કેરેટ') || text.includes('18 कैरेट')) {
-    result.purity = '18K';
-  } else if (text.includes('14k')) {
-    result.purity = '14K';
-  } else if (result.metal === 'SILVER') {
-    if (text.includes('925') || text.includes('sterling') || text.includes('92.5')) {
-      result.purity = '92.5 Silver';
+    // Check metal: Gold or Silver
+    let metal: MetalType = 'Silver';
+    if (sLower.includes('gold') || sLower.includes('sona') || sLower.includes('સોનું') || sLower.includes('સોના') || sLower.includes('सोना')) {
+      metal = 'Gold';
+    } else if (sLower.includes('silver') || sLower.includes('chandi') || sLower.includes('ચાંદી') || sLower.includes('चांदी')) {
+      metal = 'Silver';
     } else {
-      result.purity = '999 Fine Silver';
+      // Default to Silver if weight > 50g (tribal Dahod silver ornaments are heavy), otherwise Gold
+      metal = weight >= 50 ? 'Silver' : 'Gold';
     }
-  } else {
-    result.purity = '22K (916)';
-  }
 
-  // 6. Extract Principal Loan Amount or Payment Amount
-  // Matches "50000", "50,000", "50 thousand", "50k", "1.5 lakh", "50000 rupees", "५० हज़ार"
-  const amountPatterns = [
-    /(?:loan|amount|rs|rupees|inr|રૂપિયા|रुपये|पचास|લાખ|लाख)\s*(?:of|for|is|to)?\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:lakh|thousand|k|lac|rupees|rs|રૂપિયા|रुपये)?/i,
-    /(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:thousand|lakh|lac|k|rupees|rs|રૂપિયા|रुपये)/i,
-    /(?:पचास|साठ|सत्तर|अस्सी|नब्बे|સો|हज़ार|હજાર|લાખ)\s*(?:रुपये|રૂપિયા)?/i,
-  ];
-
-  for (const pat of amountPatterns) {
-    const match = text.match(pat);
-    if (match) {
-      const parsed = parseSpokenNumber(match[0]);
-      if (parsed && parsed >= 500) {
-        result.amount = parsed;
+    // Check category
+    let category = 'Other';
+    for (const [kw, catName] of Object.entries(categoryKeywords)) {
+      if (sLower.includes(kw)) {
+        category = catName;
         break;
       }
     }
-  }
 
-  // If no amount found yet, check generic large number > 500
-  if (!result.amount) {
-    const numberMatches = text.match(/\b\d{4,7}\b/g);
-    if (numberMatches && numberMatches.length > 0) {
-      result.amount = parseInt(numberMatches[0], 10);
+    // Check quantity: e.g. "pair of", "2 pcs", "2 kada"
+    let quantity = 1;
+    if (sLower.includes('pair') || sLower.includes('બે') || sLower.includes('दो') || sLower.includes('2')) {
+      quantity = 2;
+    }
+
+    // If we found a valid category or weight, add to ornaments
+    if (weight > 0 || category !== 'Other') {
+      ornaments.push({
+        metal,
+        category: category !== 'Other' ? category : (metal === 'Silver' ? 'Kandora' : 'Chain'),
+        weight: weight || (metal === 'Silver' ? 250 : 15),
+        quantity,
+      });
     }
   }
 
-  // 7. Extract Interest Rate
-  // e.g. "1.5%", "1.5 percent", "2%", "1.5 taka", "દોઢ ટકા", "डेढ़ प्रतिशत"
-  const rateMatch = text.match(/(\d+(\.\d+)?)\s*(%|percent|taka|rate|per month|ટકા|प्रतिशत|टका)/i);
-  if (rateMatch) {
-    result.interestRate = parseFloat(rateMatch[1]);
-  } else if (text.includes('દોઢ ટકા') || text.includes('डेढ़ टका') || text.includes('dedh taka') || text.includes('dodh taka')) {
-    result.interestRate = 1.5;
-  } else if (text.includes('અઢી ટકા') || text.includes('ढाई टका') || text.includes('dhai taka')) {
-    result.interestRate = 2.5;
-  } else if (text.includes('બે ટકા') || text.includes('दो टका') || text.includes('two percent')) {
-    result.interestRate = 2.0;
-  } else if (result.action === 'ADD_LOAN') {
-    result.interestRate = 1.5; // default 1.5%
+  // If no ornaments parsed from segments, provide a sensible default based on text
+  if (ornaments.length === 0) {
+    ornaments.push({
+      metal: lower.includes('gold') || lower.includes('સોના') ? 'Gold' : 'Silver',
+      category: 'Kandora',
+      weight: 500,
+      quantity: 1,
+    });
   }
 
-  // 8. Extract Customer Name
-  // Common name patterns: "for Ramesh Patel", "to Ramesh", "customer Ramesh", "રમેશભાઈ માટે", "सुरेश कुमार"
-  const namePatterns = [
-    /(?:for|to|customer|name|naam|ગ્રાહક|નામ)\s+([A-Za-z\u0A80-\u0AFF\u0900-\u097F]+(?:\s+[A-Za-z\u0A80-\u0AFF\u0900-\u097F]+)?)/i,
-    /([A-Za-z\u0A80-\u0AFF\u0900-\u097F]+(?:\s+[A-Za-z\u0A80-\u0AFF\u0900-\u097F]+)?)\s+(?:ne|ko|bhai|ben|kumar|patel|shah|sharma|singh|mehta|soni|joshi|માટે|ને|કા|કે)/i,
-  ];
-
-  for (const pat of namePatterns) {
-    const match = text.match(pat);
-    if (match && match[1]) {
-      const candidate = match[1].trim();
-      // Filter out keywords
-      const ignored = ['gold', 'silver', 'loan', 'chain', 'bangle', 'rupees', 'gram', 'percent', 'girvi', 'sohna', 'chandi', 'add', 'new'];
-      if (!ignored.includes(candidate.toLowerCase()) && candidate.length > 2) {
-        // Capitalize words
-        result.customerName = candidate
-          .split(' ')
-          .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-          .join(' ');
-        break;
-      }
-    }
-  }
-
-  // 9. Extract Phone number
-  const phoneMatch = text.match(/(?:\+91|0)?[6-9]\d{9}/);
-  if (phoneMatch) {
-    result.customerPhone = phoneMatch[0];
-  }
-
-  // 10. Generate Human-friendly Interpretation
-  if (result.action === 'ADD_LOAN') {
-    const cust = result.customerName || 'Customer';
-    const amt = result.amount ? `₹${result.amount.toLocaleString('en-IN')}` : 'Loan';
-    const wt = result.grossWeight ? `${result.grossWeight}g` : '';
-    const item = result.itemDescription || 'Jewelry';
-    const rate = result.interestRate ? `@ ${result.interestRate}%/mo` : '';
-    result.interpretedText = `Creating loan for ${cust} of ${amt} on ${wt} ${item} ${rate}`;
-  } else if (result.action === 'RECORD_PAYMENT') {
-    const cust = result.customerName || 'Customer';
-    const amt = result.amount ? `₹${result.amount.toLocaleString('en-IN')}` : 'Payment';
-    result.interpretedText = `Recording interest payment of ${amt} for ${cust}`;
-  } else if (result.action === 'SEARCH') {
-    result.searchQuery = result.customerName || rawTranscript.trim();
-    result.interpretedText = `Searching for "${result.searchQuery}"`;
-  } else if (result.action === 'SHOW_OVERDUE') {
-    result.interpretedText = 'Showing overdue and alert loan accounts';
-  } else if (result.action === 'UPDATE_RATES') {
-    result.interpretedText = 'Checking today\'s live gold and silver rates';
-  } else if (result.action === 'CALCULATE') {
-    result.interpretedText = 'Opening gold loan & collateral calculator';
-  } else {
-    result.interpretedText = `Understood: "${rawTranscript}"`;
-  }
-
-  return result;
+  return {
+    loanAmount,
+    loanDate,
+    ornaments,
+    rawText,
+  };
 }

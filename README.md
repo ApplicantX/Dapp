@@ -1,84 +1,65 @@
-# DAPP - Luxury Voice-First Jewelry & Gold/Silver Loan (Girvi) Management
+# Dahod Jewellery & Gold/Silver Lending App
 
-> **Custom built for Mom's Jewelry Store & Gold/Silver Loan Business.**
+> **Internal family operational app designed specifically for Dahod Jewellery & Gold/Silver Lending business.**
 
-DAPP is a luxury, voice-first web application designed specifically for jewelry store owners who lend money against gold and silver ornaments (Girvi Khata / Pawn Ledger). It features a dedicated speech interface with Indian accent calibration, automated collateral valuation, interest accrual calculations, printable official Girvi receipts, and one-click WhatsApp notifications.
+Digitizes the physical diary-based customer/account lookup, records physical gold & silver ornaments held in the vault, enables continuous voice-first data entry in regional Gujarati/Indian accents, and provides an independent annual compound interest calculator.
 
 ---
 
-## 🌟 Key Features
+## 🌟 Key Functional Modules (as per Specification)
 
-### 🎙️ 1. Voice-First Assistant (Designed for Non-Tech Users)
-- **Big One-Tap Microphone Button**: Just tap and speak naturally in English, Hindi (हिन्दी), or Gujarati (ગુજરાતી).
-- **Intelligent Jewelry NLP Parser**:
-  - Automatically extracts: Customer Name, Phone, Ornament Type (Chain, Bangles, Ring, Necklace, Silver Utensils), Weight (Grams/Tola), Purity (24K, 22K 916 Hallmark, 18K, 999 Silver), Principal Loan Amount, and Monthly Interest Rate (%).
-  - Example: *"Add loan for Ramesh Patel 50,000 rupees on 20 gram 22 carat gold chain at 1.5%"*
-- **Live Visual Waveform & Confirmation**: Pulsating royal purple & gold audio wave while speaking.
-- **Voice Response (TTS)**: DAPP speaks back confirmations in a clear, warm voice so Mom always knows the action was recorded.
+### 1. Dashboard / Starting Screen (Two Large Options)
+- **Compound Interest Calculator**: Direct access to jewellery annual compound interest calculations.
+- **Customer Details**: Direct access to customer lookup, active held ornaments, and loan history.
 
-### 🪙 2. Gold & Silver Collateral & Loan Ledger (Girvi Khata)
-- **Multi-Item Collateral Support**: Record multiple items per loan (e.g., pair of bangles + ring).
-- **Real-Time Market Valuation**: Auto-calculates accurate collateral market value based on live 24K, 22K 916, 18K gold and silver rates.
-- **Safe Lending Guideline**: Displays safe 75% LTV recommendation so loans are always secure.
-- **Accrued Interest Calculator**: Real-time simple monthly interest calculation showing months/days elapsed, interest paid, and total balance payable today.
+### 2. Customer Lookup & Diary Management
+- **Search by Name & Village**: Disambiguates customers with identical names using their village (e.g., *Ramesh Mishra from Vova* vs *Ramesh Patel from Limkheda*).
+- **Physical Diary Reference**: Shows the exact Diary (e.g. `Diary 2026`) and Page Number (e.g. `142`).
+- **Diary Page Move**: Easily update the diary and page reference when a physical diary fills up, automatically recording the move in audit history.
+- **Voice Search**: Real-time microphone search with fuzzy matching.
 
-### 🧾 3. Official Girvi Receipts & WhatsApp Integration
-- **Printable Pawn Receipt (Girvi Pavti / ગિરવે પાવતી)**: Official store slip with store details, GST, customer info, pledged ornaments table, terms, and signature lines.
-- **1-Click WhatsApp Reminders**: Send formatted statement or receipt directly to customer's WhatsApp in one tap.
+### 3. Voice-First Data Entry
+- **Continuous Voice Recording**: Microphone keeps listening through ordinary thinking pauses until the user explicitly taps the large **STOP** button.
+- **Single Customer Voice Entry**: Speaks name, village, diary, and page number (*"Ramesh Mishra from Vova village, Diary 2026, Page 142"*).
+- **Bulk Customer Voice Entry**: Speak multiple customers in a single session (*"1. Ramesh Patel from Vova Diary 2026 Page 12, 2. Suresh Damor from Garbada Diary 2025 Page 84..."*). Automatically parses into numbered editable cards with missing info alerts and **"SAVE ALL CUSTOMERS"**.
+- **Loan Voice Entry ("SPEAK NEW LOAN")**: Speak total loan amount and multiple ornaments in one phrase (*"Add 500 grams silver kandora and 200 grams silver kada for a total loan amount of fifty thousand rupees on 12 August"*). Extracts separate physical ornament records and loan amount.
 
-### 📊 4. Store Dashboard & Valuation Calculator
-- **Vault Summary**: Total Gold in Vault (grams), Total Silver in Vault, and total asset valuation.
-- **Instant Quotes**: Fast on-the-spot calculator when customers ask how much they can borrow for their gold.
+### 4. Separate Physical Ornament Records & Vault Holdings
+- Each physical ornament is stored as a distinct record (Metal: Gold/Silver, Category: Kandora, Kada, Ring, Chain, etc., Weight in grams, Quantity).
+- **Active Vault Holdings**: Displays all pledged ornaments currently in vault across active loans.
+- **Closed Loans**: Marked with bold **RED** visual status. Ornaments remain in historical loan records but are removed from active vault holdings.
 
-### 💾 5. Offline-First & Backup
-- Automatically saves everything in local storage.
-- 1-click JSON backup export and restore.
+### 5. Independent Compound Interest Calculator
+- Annual compounding: $A = P 	imes (1 + r)^t$, $	ext{Interest} = A - P$.
+- Select 1 to 20 items.
+- Editable annual rate (% p.a., supports decimals like 18, 21.5).
+- Calculates Principal, Interest, and Total per item and displays Grand Totals in INR (`₹`).
+
+### 6. Data Export & Backup
+- **Multi-Sheet Excel Workbook (.xlsx)**: Generates 4 sheets:
+  1. `Customers` (Name, Village, Mobile, Diary, Page Number, Created Date)
+  2. `Loans` (Customer, Village, Diary/Page, Loan Date, Loan Amount, Status, Closed Date)
+  3. `Ornaments` (Customer, Village, Loan Date, Loan Amount, Metal, Category, Weight, Quantity, Description)
+  4. `Activity History` (Date/Time, User, Action, Customer, Village, Details)
+- **JSON Database Backup**: 1-click full machine-readable backup and restore.
 
 ---
 
 ## 🚀 Running Locally
 
-From your terminal in `/Users/nirvangandhi/Desktop/Dapp`:
-
-```bash
-# 1. Start the development server
-npm run dev
-
-# 2. Open in your browser
-http://localhost:3000
-```
-
----
-
-## 📦 Building for Production
-
-```bash
-npm run build
-npm start
-```
-
----
-
-## 🔄 Syncing with GitHub & Deploying to Vercel
-
-### Step 1: Initialize Git and Commit
 ```bash
 cd /Users/nirvangandhi/Desktop/Dapp
-git init
-git add .
-git commit -m "Initial commit of DAPP Jewelry Loan App"
+npm run dev
 ```
 
-### Step 2: Push to GitHub
-1. Create a new repository on [GitHub](https://github.com/new) named `dapp-jewelry-loan`.
-2. Push your local repo:
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+---
+
+## 🔄 Git & Deployment
+
 ```bash
-git remote add origin https://github.com/<YOUR_GITHUB_USERNAME>/dapp-jewelry-loan.git
-git branch -M main
-git push -u origin main
+cd /Users/nirvangandhi/Desktop/Dapp
+git add .
+git commit -m "Update Dahod Jewellery Lending app"
 ```
-
-### Step 3: Deploy to Vercel
-1. Go to [Vercel Dashboard](https://vercel.com/new).
-2. Click **Import Repository** and select `dapp-jewelry-loan`.
-3. Click **Deploy**. Vercel will automatically build and deploy your Next.js application with a live HTTPS URL (e.g., `https://dapp-jewelry-loan.vercel.app`).

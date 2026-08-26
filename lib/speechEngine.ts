@@ -1,120 +1,25 @@
 'use client';
 
-export interface SpeechRecognitionCallbacks {
-  onInterimResult?: (text: string) => void;
-  onFinalResult?: (text: string) => void;
+export interface ContinuousSpeechCallbacks {
+  onInterimResult?: (transcript: string) => void;
+  onFinalResult?: (transcript: string) => void;
   onError?: (error: string) => void;
   onStart?: () => void;
   onEnd?: () => void;
-  onAudioLevel?: (level: number) => void; // 0 to 1 for visualizer
+  onAudioLevel?: (level: number) => void;
 }
 
-export class CustomAudioRecorder {
-  private mediaRecorder: MediaRecorder | null = null;
-  private audioChunks: Blob[] = [];
+export class ContinuousSpeechEngine {
+  private recognition: any = null;
+  private isExplicitlyRecording: boolean = false;
+  private currentFullTranscript: string = '';
   private audioContext: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
-  private source: MediaStreamAudioSourceNode | null = null;
-  private animFrameId: number | null = null;
   private stream: MediaStream | null = null;
+  private animFrameId: number | null = null;
+  private callbacks: ContinuousSpeechCallbacks = {};
 
-  async start(onAudioLevel?: (level: number) => void): Promise<void> {
-    this.audioChunks = [];
-
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-    });
-    this.stream = stream;
-
-    // Set up AudioContext for real-time visualizer
-    try {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      this.audioContext = new AudioCtx();
-      this.analyser = this.audioContext.createAnalyser();
-      this.analyser.fftSize = 128;
-      this.source = this.audioContext.createMediaStreamSource(stream);
-      this.source.connect(this.analyser);
-
-      if (onAudioLevel) {
-        const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-        const checkLevel = () => {
-          if (!this.analyser) return;
-          this.analyser.getByteFrequencyData(dataArray);
-          let sum = 0;
-          for (let i = 0; i < dataArray.length; i++) {
-            sum += dataArray[i];
-          }
-          const avg = sum / dataArray.length;
-          const normalized = Math.min(1, avg / 128);
-          onAudioLevel(normalized);
-          this.animFrameId = requestAnimationFrame(checkLevel);
-        };
-        checkLevel();
-      }
-    } catch (e) {
-      console.warn('AudioContext visualization not available:', e);
-    }
-
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-      ? 'audio/webm;codecs=opus'
-      : MediaRecorder.isTypeSupported('audio/webm')
-      ? 'audio/webm'
-      : 'audio/mp4';
-
-    this.mediaRecorder = new MediaRecorder(stream, { mimeType });
-    this.mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        this.audioChunks.push(event.data);
-      }
-    };
-    this.mediaRecorder.start(100);
-  }
-
-  async stop(): Promise<Blob> {
-    return new Promise((resolve) => {
-      if (this.animFrameId) {
-        cancelAnimationFrame(this.animFrameId);
-      }
-      if (this.audioContext && this.audioContext.state !== 'closed') {
-        this.audioContext.close().catch(() => {});
-      }
-
-      if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') {
-        const blob = new Blob(this.audioChunks, { type: 'audio/webm' });
-        this.cleanup();
-        resolve(blob);
-        return;
-      }
-
-      this.mediaRecorder.onstop = () => {
-        const mimeType = this.mediaRecorder?.mimeType || 'audio/webm';
-        const blob = new Blob(this.audioChunks, { type: mimeType });
-        this.cleanup();
-        resolve(blob);
-      };
-
-      this.mediaRecorder.stop();
-    });
-  }
-
-  private cleanup() {
-    if (this.stream) {
-      this.stream.getTracks().forEach((track) => track.stop());
-      this.stream = null;
-    }
-  }
-}
-
-// Browser Web Speech Recognition with Indian English / Hindi / Gujarati support
-export class BrowserSpeechEngine {
-  private recognition: any = null;
-  private isRunning: boolean = false;
-
-  constructor(lang: 'en' | 'hi' | 'gu' = 'en') {
+  constructor(lang: string = 'en-IN') {
     if (typeof window !== 'undefined') {
       const SpeechRecognition =
         (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -122,138 +27,144 @@ export class BrowserSpeechEngine {
         this.recognition = new SpeechRecognition();
         this.recognition.continuous = true;
         this.recognition.interimResults = true;
-        this.setLanguage(lang);
+        this.recognition.lang = lang;
       }
     }
   }
 
-  setLanguage(lang: 'en' | 'hi' | 'gu') {
-    if (!this.recognition) return;
-    if (lang === 'hi') {
-      this.recognition.lang = 'hi-IN';
-    } else if (lang === 'gu') {
-      this.recognition.lang = 'gu-IN';
-    } else {
-      this.recognition.lang = 'en-IN'; // Indian English
+  setLanguage(lang: string) {
+    if (this.recognition) {
+      this.recognition.lang = lang;
     }
   }
 
-  start(callbacks: SpeechRecognitionCallbacks) {
+  async start(callbacks: ContinuousSpeechCallbacks) {
+    this.callbacks = callbacks;
+    this.currentFullTranscript = '';
+    this.isExplicitlyRecording = true;
+
+    // Start Web Audio Level Meter
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      this.stream = stream;
+
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      this.audioContext = new AudioCtx();
+      this.analyser = this.audioContext.createAnalyser();
+      this.analyser.fftSize = 128;
+      const source = this.audioContext.createMediaStreamSource(stream);
+      source.connect(this.analyser);
+
+      if (callbacks.onAudioLevel) {
+        const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+        const checkLevel = () => {
+          if (!this.analyser || !this.isExplicitlyRecording) return;
+          this.analyser.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i];
+          }
+          const avg = sum / dataArray.length;
+          const normalized = Math.min(1, avg / 128);
+          callbacks.onAudioLevel?.(normalized);
+          this.animFrameId = requestAnimationFrame(checkLevel);
+        };
+        checkLevel();
+      }
+    } catch (err: any) {
+      console.warn('Microphone stream error:', err);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        callbacks.onError?.('Microphone permission denied. Please allow microphone access in your browser settings.');
+        this.isExplicitlyRecording = false;
+        return;
+      }
+    }
+
     if (!this.recognition) {
-      callbacks.onError?.('Speech recognition is not supported in this browser.');
+      callbacks.onError?.('Speech recognition is not supported in this browser. Please use Google Chrome, Edge, or Safari.');
       return;
     }
 
-    if (this.isRunning) {
-      try {
-        this.recognition.stop();
-      } catch (e) {}
-    }
-
     this.recognition.onstart = () => {
-      this.isRunning = true;
       callbacks.onStart?.();
     };
 
     this.recognition.onresult = (event: any) => {
-      let interimTranscript = '';
-      let finalTranscript = '';
-
+      let interim = '';
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript;
+          this.currentFullTranscript += ' ' + event.results[i][0].transcript;
         } else {
-          interimTranscript += event.results[i][0].transcript;
+          interim += event.results[i][0].transcript;
         }
       }
-
-      if (interimTranscript) {
-        callbacks.onInterimResult?.(interimTranscript);
-      }
-      if (finalTranscript) {
-        callbacks.onFinalResult?.(finalTranscript);
-      }
+      const combined = (this.currentFullTranscript + ' ' + interim).trim();
+      callbacks.onInterimResult?.(combined);
     };
 
     this.recognition.onerror = (event: any) => {
       if (event.error !== 'no-speech') {
-        callbacks.onError?.(event.error);
+        console.warn('Speech recognition error:', event.error);
+        if (event.error === 'not-allowed') {
+          callbacks.onError?.('Microphone permission denied.');
+        }
       }
     };
 
+    // Continuous listening: If recognition ends while isExplicitlyRecording is true (due to pause), restart!
     this.recognition.onend = () => {
-      this.isRunning = false;
-      callbacks.onEnd?.();
+      if (this.isExplicitlyRecording) {
+        try {
+          this.recognition.start();
+        } catch (e) {
+          // Restart gracefully
+        }
+      } else {
+        callbacks.onEnd?.();
+      }
     };
 
     try {
       this.recognition.start();
-    } catch (err: any) {
-      console.warn('Speech start error:', err);
+    } catch (err) {
+      console.warn('Recognition start exception:', err);
     }
   }
 
-  stop() {
-    if (this.recognition && this.isRunning) {
+  stop(): string {
+    this.isExplicitlyRecording = false;
+
+    if (this.animFrameId) {
+      cancelAnimationFrame(this.animFrameId);
+      this.animFrameId = null;
+    }
+
+    if (this.audioContext && this.audioContext.state !== 'closed') {
+      this.audioContext.close().catch(() => {});
+      this.audioContext = null;
+    }
+
+    if (this.stream) {
+      this.stream.getTracks().forEach((track) => track.stop());
+      this.stream = null;
+    }
+
+    if (this.recognition) {
       try {
         this.recognition.stop();
       } catch (e) {}
-      this.isRunning = false;
     }
+
+    const finalTranscript = this.currentFullTranscript.trim();
+    this.callbacks.onFinalResult?.(finalTranscript);
+    return finalTranscript;
   }
-}
-
-// Speak confirmation text back to Mom (Text-To-Speech)
-export function speakFeedback(text: string, lang: 'en' | 'hi' | 'gu' = 'en'): void {
-  if (typeof window === 'undefined' || !window.speechSynthesis) return;
-
-  try {
-    window.speechSynthesis.cancel(); // stop any ongoing speech
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.95; // Slightly slower, very clear and warm for mom
-    utterance.pitch = 1.05;
-
-    // Pick best matching voice
-    const voices = window.speechSynthesis.getVoices();
-    const targetLangCode = lang === 'hi' ? 'hi' : lang === 'gu' ? 'gu' : 'en-IN';
-    const voice =
-      voices.find((v) => v.lang.toLowerCase().includes(targetLangCode.toLowerCase())) ||
-      voices.find((v) => v.lang.toLowerCase().includes('in')) ||
-      voices[0];
-
-    if (voice) {
-      utterance.voice = voice;
-    }
-    utterance.lang = lang === 'hi' ? 'hi-IN' : lang === 'gu' ? 'gu-IN' : 'en-IN';
-
-    window.speechSynthesis.speak(utterance);
-  } catch (err) {
-    console.warn('TTS speak error:', err);
-  }
-}
-
-// Play pleasant confirmation sound
-export function playSuccessChime(): void {
-  if (typeof window === 'undefined') return;
-  try {
-    const AudioCtx =
-      window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const ctx = new AudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1); // A5
-    osc.frequency.setValueAtTime(1174.66, ctx.currentTime + 0.2); // D6
-
-    gain.gain.setValueAtTime(0.2, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start();
-    osc.stop(ctx.currentTime + 0.6);
-  } catch (e) {}
 }
