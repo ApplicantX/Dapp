@@ -1,4 +1,4 @@
-import { AppData, Customer, Loan, ActivityLog, Ornament, LoanStatus } from './types';
+import { AppData, Customer, Loan, ActivityLog, Ornament, LoanStatus, BulkCustomerLoanRecord } from './types';
 import { initialAppData } from './sampleData';
 import * as XLSX from 'xlsx';
 
@@ -74,7 +74,6 @@ export function addCustomer(data: AppData, customer: Omit<Customer, 'id' | 'crea
   const updatedCustomers = [newCustomer, ...data.customers];
   let updatedData: AppData = { ...data, customers: updatedCustomers };
 
-  // Ensure village and diary exist in master list
   if (!updatedData.villages.includes(customer.village)) {
     updatedData.villages = [...updatedData.villages, customer.village];
   }
@@ -105,7 +104,6 @@ export function addBatchCustomers(data: AppData, newCustomersList: Omit<Customer
   const updatedCustomers = [...created, ...data.customers];
   let updatedData: AppData = { ...data, customers: updatedCustomers };
 
-  // Update villages and diaries
   const villageSet = new Set(updatedData.villages);
   const diarySet = new Set(updatedData.diaries);
   newCustomersList.forEach((c) => {
@@ -120,13 +118,13 @@ export function addBatchCustomers(data: AppData, newCustomersList: Omit<Customer
     'CREATE_CUSTOMER',
     `Batch of ${created.length} Customers`,
     'Various',
-    `Created ${created.length} customers in bulk voice entry: ${created.map((c) => `${c.name} (${c.village}, ${c.diary} p.${c.pageNumber})`).join('; ')}`
+    `Created ${created.length} customers in bulk voice entry`
   );
 
   return updatedData;
 }
 
-// Update Customer (including moving Diary & Page)
+// Update Customer
 export function updateCustomer(data: AppData, customerId: string, updates: Partial<Customer>): AppData {
   const existing = data.customers.find((c) => c.id === customerId);
   if (!existing) return data;
@@ -160,14 +158,14 @@ export function updateCustomer(data: AppData, customerId: string, updates: Parti
       'EDIT_CUSTOMER',
       existing.name,
       existing.village,
-      `Updated customer details: ${JSON.stringify(updates)}`
+      `Updated customer details`
     );
   }
 
   return updatedData;
 }
 
-// Add a Loan under a Customer
+// Add a Loan
 export function addLoan(
   data: AppData,
   customerId: string,
@@ -206,7 +204,7 @@ export function addLoan(
   return updatedData;
 }
 
-// Close a Loan (Mark CLOSED with RED visual treatment, retain in history)
+// Close a Loan
 export function closeLoan(data: AppData, loanId: string): AppData {
   const loan = data.loans.find((l) => l.id === loanId);
   if (!loan) return data;
@@ -243,11 +241,10 @@ export function closeLoan(data: AppData, loanId: string): AppData {
   return updatedData;
 }
 
-// Export All Data to Multi-Sheet Excel (.xlsx) as specified in Requirements Section 18
+// Export All Data to Multi-Sheet Excel (.xlsx)
 export function exportToExcel(data: AppData): void {
   const wb = XLSX.utils.book_new();
 
-  // Sheet 1: Customers
   const customerRows = data.customers.map((c) => ({
     'Customer Name': c.name,
     'Village': c.village,
@@ -259,7 +256,6 @@ export function exportToExcel(data: AppData): void {
   const wsCustomers = XLSX.utils.json_to_sheet(customerRows);
   XLSX.utils.book_append_sheet(wb, wsCustomers, 'Customers');
 
-  // Sheet 2: Loans
   const loanRows = data.loans.map((l) => {
     const cust = data.customers.find((c) => c.id === l.customerId);
     return {
@@ -277,7 +273,6 @@ export function exportToExcel(data: AppData): void {
   const wsLoans = XLSX.utils.json_to_sheet(loanRows);
   XLSX.utils.book_append_sheet(wb, wsLoans, 'Loans');
 
-  // Sheet 3: Ornaments
   const ornamentRows: any[] = [];
   data.loans.forEach((l) => {
     const cust = data.customers.find((c) => c.id === l.customerId);
@@ -299,7 +294,6 @@ export function exportToExcel(data: AppData): void {
   const wsOrnaments = XLSX.utils.json_to_sheet(ornamentRows);
   XLSX.utils.book_append_sheet(wb, wsOrnaments, 'Ornaments');
 
-  // Sheet 4: Activity History
   const activityRows = data.activityLogs.map((a) => ({
     'Date / Time': new Date(a.timestamp).toLocaleString('en-IN'),
     'User': a.user,
@@ -311,12 +305,141 @@ export function exportToExcel(data: AppData): void {
   const wsActivity = XLSX.utils.json_to_sheet(activityRows);
   XLSX.utils.book_append_sheet(wb, wsActivity, 'Activity History');
 
-  // Generate and Download File
   const filename = `Dahod_Jewellery_Lending_Data_${new Date().toISOString().split('T')[0]}.xlsx`;
   XLSX.writeFile(wb, filename);
 }
 
-// Export Complete JSON Backup
+// Dedicated 500+ Bulk Voice Records to Excel Export (.xlsx)
+export function exportBulkRecordsToExcel(records: BulkCustomerLoanRecord[]): void {
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: Master Captured Records
+  const rows = records.map((r, index) => ({
+    '#': index + 1,
+    'Customer Name': r.name,
+    'Village (ગામ)': r.village,
+    'Diary Reference': r.diary,
+    'Page Number': r.pageNumber,
+    'Mobile Number': r.mobile || '',
+    'Loan Amount (₹)': r.loanAmount,
+    'Metal': r.metal,
+    'Ornament Category': r.category,
+    'Weight (Grams)': r.weight,
+    'Quantity': r.quantity,
+    'Status': r.status,
+    'Warnings': r.warningMessage || 'None',
+    'Raw Spoken Statement': r.rawSpeech,
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  // Auto column widths
+  ws['!cols'] = [
+    { wch: 4 },
+    { wch: 22 },
+    { wch: 16 },
+    { wch: 14 },
+    { wch: 12 },
+    { wch: 15 },
+    { wch: 16 },
+    { wch: 10 },
+    { wch: 18 },
+    { wch: 14 },
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 20 },
+    { wch: 40 },
+  ];
+  XLSX.utils.book_append_sheet(wb, ws, 'Captured Customer Records');
+
+  // Sheet 2: Summary Stats
+  const totalPrincipal = records.reduce((sum, r) => sum + r.loanAmount, 0);
+  const totalGoldGrams = records.filter((r) => r.metal === 'Gold').reduce((sum, r) => sum + r.weight, 0);
+  const totalSilverGrams = records.filter((r) => r.metal === 'Silver').reduce((sum, r) => sum + r.weight, 0);
+
+  const summaryRows = [
+    { 'Summary Metric': 'Total Customer Entries', 'Value': records.length },
+    { 'Summary Metric': 'Total Loan Principal (₹)', 'Value': totalPrincipal },
+    { 'Summary Metric': 'Total Pledged Gold (Grams)', 'Value': totalGoldGrams.toFixed(1) },
+    { 'Summary Metric': 'Total Pledged Silver (Grams)', 'Value': totalSilverGrams.toFixed(1) },
+    { 'Summary Metric': 'Export Timestamp', 'Value': new Date().toLocaleString('en-IN') },
+  ];
+  const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+  XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary Stats');
+
+  const filename = `Dahod_Voice_Bulk_Import_${records.length}_Customers_${new Date().toISOString().split('T')[0]}.xlsx`;
+  XLSX.writeFile(wb, filename);
+}
+
+// Commit Bulk Voice Records directly to App Database
+export function commitBulkRecordsToDatabase(data: AppData, records: BulkCustomerLoanRecord[]): AppData {
+  let updatedData = { ...data };
+  const today = new Date().toISOString().split('T')[0];
+
+  records.forEach((rec) => {
+    // 1. Create or Find Customer
+    let cust = updatedData.customers.find(
+      (c) => c.name.toLowerCase() === rec.name.toLowerCase() && c.village.toLowerCase() === rec.village.toLowerCase()
+    );
+
+    if (!cust) {
+      const newCust: Customer = {
+        id: `cust-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        name: rec.name.trim(),
+        village: rec.village.trim() || 'Dahod',
+        diary: rec.diary.trim() || 'Diary 2026',
+        pageNumber: rec.pageNumber.trim() || '1',
+        mobile: rec.mobile ? rec.mobile.trim() : undefined,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      updatedData.customers = [newCust, ...updatedData.customers];
+      cust = newCust;
+    }
+
+    // 2. Create Loan under this customer
+    const newLoan: Loan = {
+      id: `loan-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      customerId: cust.id,
+      loanDate: today,
+      loanAmount: Number(rec.loanAmount) || 50000,
+      status: 'ACTIVE',
+      ornaments: [
+        {
+          id: `orn-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          metal: rec.metal,
+          category: rec.category,
+          weight: rec.weight,
+          quantity: rec.quantity,
+          description: rec.rawSpeech || '',
+        },
+      ],
+      notes: `Bulk voice entry: ${rec.rawSpeech}`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    updatedData.loans = [newLoan, ...updatedData.loans];
+  });
+
+  // Ensure villages and categories are up to date
+  const villageSet = new Set(updatedData.villages);
+  records.forEach((r) => {
+    if (r.village) villageSet.add(r.village);
+  });
+  updatedData.villages = Array.from(villageSet);
+
+  updatedData = recordActivity(
+    updatedData,
+    'BULK_IMPORT',
+    `${records.length} Bulk Customers`,
+    'Dahod Region',
+    `Imported ${records.length} customer loan accounts from bulk voice input session.`
+  );
+
+  saveStoredData(updatedData);
+  return updatedData;
+}
+
+// JSON Backup export and restore
 export function exportToJSON(data: AppData): void {
   const jsonStr = JSON.stringify(data, null, 2);
   const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -328,7 +451,6 @@ export function exportToJSON(data: AppData): void {
   URL.revokeObjectURL(url);
 }
 
-// Restore Complete JSON Backup
 export function importFromJSON(jsonString: string): AppData | null {
   try {
     const parsed = JSON.parse(jsonString);

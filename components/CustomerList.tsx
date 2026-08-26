@@ -7,13 +7,11 @@ import {
   Search,
   Mic,
   MicOff,
-  PlusCircle,
+  Plus,
   User,
   BookOpen,
   MapPin,
   Phone,
-  Gem,
-  Coins,
   ChevronRight,
   Sparkles,
 } from 'lucide-react';
@@ -88,24 +86,24 @@ export const CustomerList: React.FC<CustomerListProps> = ({
   }, [customers, searchQuery]);
 
   return (
-    <div className="space-y-6">
-      {/* Search Bar & Primary Actions */}
-      <div className="bg-purple-950/80 p-5 rounded-3xl border border-purple-800 shadow-royal space-y-4">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+    <div className="space-y-6 max-w-4xl mx-auto">
+      {/* Search Header Bar (Google Material 3 Style) */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
           {/* Main Search Input */}
           <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gold-400" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gold-400/80" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by customer name or village (e.g. Ramesh, Vova, 142)..."
-              className="w-full pl-12 pr-10 py-3.5 rounded-2xl bg-purple-900/90 border-2 border-purple-700/60 focus:border-gold-400 focus:outline-none text-white placeholder-purple-300 font-bold text-base sm:text-lg transition-all"
+              placeholder="Search customer name or village (e.g. Ramesh, Vova, 142)..."
+              className="w-full pl-12 pr-10 py-3.5 rounded-full bg-[#130324]/90 border border-purple-500/20 focus:border-gold-400/60 focus:bg-[#1a0631] text-white placeholder-purple-200/40 text-sm sm:text-base font-medium transition-all shadow-card focus:outline-none"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs bg-purple-800 hover:bg-purple-700 text-purple-200 px-2 py-1 rounded-md"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-purple-300 hover:text-white"
               >
                 Clear
               </button>
@@ -115,21 +113,21 @@ export const CustomerList: React.FC<CustomerListProps> = ({
           {/* Central Voice Search Button */}
           <button
             onClick={isVoiceSearching ? stopVoiceSearch : startVoiceSearch}
-            className={`flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl font-black text-sm sm:text-base border-2 transition-all transform active:scale-95 ${
+            className={`flex items-center gap-2 px-5 py-3.5 rounded-full font-bold text-xs sm:text-sm border transition-all duration-200 transform active:scale-95 flex-shrink-0 ${
               isVoiceSearching
-                ? 'bg-rose-600 border-gold-300 text-white shadow-[0_0_25px_rgba(225,29,72,0.6)] animate-pulse'
-                : 'bg-gradient-to-r from-purple-700 via-purple-600 to-gold-500 hover:from-purple-600 hover:to-gold-400 text-white border-gold-400/50 shadow-purple-glow'
+                ? 'bg-rose-600 border-rose-400 text-white shadow-[0_0_20px_rgba(225,29,72,0.5)] animate-pulse'
+                : 'bg-purple-900/60 hover:bg-purple-800/80 text-gold-300 border-gold-500/30 hover:border-gold-400'
             }`}
           >
             {isVoiceSearching ? (
               <>
-                <MicOff className="w-5 h-5 animate-bounce" />
-                <span>STOP LISTENING</span>
+                <MicOff className="w-4 h-4 animate-bounce" />
+                <span>STOP</span>
               </>
             ) : (
               <>
-                <Mic className="w-5 h-5 text-gold-200" />
-                <span>Voice Search (બોલીને શોધો)</span>
+                <Mic className="w-4 h-4 text-gold-400" />
+                <span className="hidden sm:inline">Voice Search</span>
               </>
             )}
           </button>
@@ -137,40 +135,39 @@ export const CustomerList: React.FC<CustomerListProps> = ({
           {/* Add New Customer Button */}
           <button
             onClick={onOpenNewCustomerModal}
-            className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-gold-500 hover:bg-gold-400 text-purple-950 font-black text-sm sm:text-base shadow-gold-glow border border-gold-300 transition-all active:scale-95"
+            className="flex items-center gap-2 px-5 py-3.5 rounded-full bg-gold-500 hover:bg-gold-400 text-purple-950 font-bold text-xs sm:text-sm shadow-gold-glow border border-gold-300 transition-all flex-shrink-0 active:scale-95"
           >
-            <PlusCircle className="w-5 h-5" />
-            <span>+ New Customer</span>
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">New Customer</span>
+            <span className="sm:hidden">New</span>
           </button>
         </div>
 
-        {/* Voice Search Transcript Banner if active */}
+        {/* Voice Search Feedback Banner */}
         {isVoiceSearching && (
-          <div className="bg-purple-900/90 p-3 rounded-2xl border border-gold-400 text-center animate-pulse">
-            <span className="text-xs text-gold-300 font-bold uppercase tracking-wider block mb-1">
-              🎙️ Continuous Voice Search Active (Speak name or village):
+          <div className="bg-purple-900/60 p-3 rounded-2xl border border-gold-400/40 text-center animate-pulse">
+            <span className="text-[11px] text-gold-300 font-semibold uppercase tracking-wider block">
+              Continuous Voice Search Active
             </span>
-            <p className="text-base font-extrabold text-white">
-              "{voiceSearchText || 'Listening...'}"
+            <p className="text-sm font-bold text-white mt-0.5">
+              "{voiceSearchText || 'Listening for customer name or village...'}"
             </p>
           </div>
         )}
       </div>
 
-      {/* Customer Results List */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between px-2 text-xs font-bold text-purple-300 uppercase tracking-wider">
+      {/* Customer Cards List */}
+      <div className="space-y-3 pt-2">
+        <div className="flex items-center justify-between px-2 text-xs font-semibold text-purple-200/50 uppercase tracking-wider">
           <span>Matching Accounts ({filteredCustomers.length})</span>
-          <span>Click any customer to open account</span>
+          <span>Click to view details</span>
         </div>
 
         {filteredCustomers.length > 0 ? (
           <div className="grid grid-cols-1 gap-3">
             {filteredCustomers.map((cust) => {
-              // Customer's loans and ornaments
               const custLoans = loans.filter((l) => l.customerId === cust.id);
               const activeLoans = custLoans.filter((l) => l.status === 'ACTIVE');
-              const closedLoans = custLoans.filter((l) => l.status === 'CLOSED');
 
               let activeGoldGrams = 0;
               let activeSilverGrams = 0;
@@ -188,62 +185,62 @@ export const CustomerList: React.FC<CustomerListProps> = ({
                 <div
                   key={cust.id}
                   onClick={() => onSelectCustomer(cust)}
-                  className="cursor-pointer bg-gradient-to-r from-purple-950 via-purple-900 to-purple-950 p-5 rounded-3xl border border-purple-800 hover:border-gold-400 shadow-royal transition-all group hover:scale-[1.01]"
+                  className="cursor-pointer bg-[#130324]/80 hover:bg-[#1c0733] p-5 rounded-2xl border border-purple-500/15 hover:border-gold-400/40 shadow-card hover:shadow-card-hover transition-all duration-200 group"
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    {/* Left: Name, Village & Diary Reference */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    {/* Left: Customer Info & Village */}
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-3">
-                        <h3 className="text-xl sm:text-2xl font-black text-white group-hover:text-gold-300 transition-colors">
+                        <h3 className="text-lg sm:text-xl font-bold text-white group-hover:text-gold-300 transition-colors">
                           {cust.name}
                         </h3>
-                        {/* Village Badge (Crucial for disambiguating duplicate names) */}
-                        <span className="px-3 py-1 rounded-full bg-gold-500/20 border border-gold-400/40 text-gold-300 font-extrabold text-xs tracking-wider flex items-center gap-1">
-                          <MapPin className="w-3.5 h-3.5" />
-                          <span>Village: {cust.village}</span>
+                        {/* Village Pill */}
+                        <span className="px-2.5 py-0.5 rounded-full bg-gold-500/10 border border-gold-500/20 text-gold-300 font-semibold text-xs flex items-center gap-1">
+                          <MapPin className="w-3 h-3 text-gold-400" />
+                          <span>{cust.village}</span>
                         </span>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-purple-200">
-                        {/* Diary & Page Reference */}
-                        <span className="bg-purple-850 px-2.5 py-1 rounded-lg border border-purple-700 text-purple-100 flex items-center gap-1.5">
-                          <BookOpen className="w-3.5 h-3.5 text-gold-400" />
+                      {/* Diary & Page Reference */}
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-purple-200/70">
+                        <span className="bg-purple-900/40 px-2.5 py-0.5 rounded-md border border-purple-500/20 text-purple-200 font-medium flex items-center gap-1.5">
+                          <BookOpen className="w-3.5 h-3.5 text-gold-400/80" />
                           <span>
                             {cust.diary} • <strong className="text-gold-300">Page {cust.pageNumber}</strong>
                           </span>
                         </span>
 
                         {cust.mobile && (
-                          <span className="flex items-center gap-1 text-purple-300">
-                            <Phone className="w-3.5 h-3.5" />
+                          <span className="flex items-center gap-1 text-purple-300/80">
+                            <Phone className="w-3 h-3" />
                             <span>{cust.mobile}</span>
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* Right: Active Ornaments & Loan Summary */}
-                    <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-3 sm:pt-0 border-purple-800">
+                    {/* Right: Active Ornaments & Loans Summary */}
+                    <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-purple-500/10">
                       <div className="text-left sm:text-right">
                         {activeLoans.length > 0 ? (
                           <>
-                            <div className="text-base sm:text-lg font-black text-emerald-300">
+                            <div className="text-sm sm:text-base font-bold text-emerald-400">
                               ₹{activeLoanTotal.toLocaleString('en-IN')} Active
                             </div>
-                            <div className="text-xs text-gold-300 font-bold flex items-center sm:justify-end gap-2 mt-0.5">
+                            <div className="text-[11px] text-gold-300/90 font-medium flex items-center sm:justify-end gap-2 mt-0.5">
                               {activeGoldGrams > 0 && <span>🪙 {activeGoldGrams}g Gold</span>}
                               {activeSilverGrams > 0 && <span>🥈 {activeSilverGrams}g Silver</span>}
                             </div>
                           </>
                         ) : (
-                          <div className="text-xs font-bold text-purple-400 bg-purple-900/60 px-3 py-1 rounded-full">
-                            No Active Loans ({closedLoans.length} Closed in History)
-                          </div>
+                          <span className="text-xs text-purple-300/50 font-medium">
+                            No Active Loans
+                          </span>
                         )}
                       </div>
 
-                      <div className="w-10 h-10 rounded-2xl bg-purple-900 group-hover:bg-gold-500 group-hover:text-purple-950 text-gold-300 flex items-center justify-center transition-all">
-                        <ChevronRight className="w-6 h-6" />
+                      <div className="w-8 h-8 rounded-full bg-purple-900/40 group-hover:bg-gold-500 group-hover:text-purple-950 text-purple-300 flex items-center justify-center transition-colors">
+                        <ChevronRight className="w-4 h-4" />
                       </div>
                     </div>
                   </div>
@@ -252,17 +249,17 @@ export const CustomerList: React.FC<CustomerListProps> = ({
             })}
           </div>
         ) : (
-          <div className="text-center py-16 px-4 bg-purple-950/40 rounded-3xl border-2 border-dashed border-purple-800">
-            <User className="w-12 h-12 text-purple-400 mx-auto mb-3" />
-            <h3 className="text-lg font-bold text-white mb-1">No customers found</h3>
-            <p className="text-xs text-purple-300 max-w-sm mx-auto mb-4">
-              No matching records found for "{searchQuery}". You can add this customer now.
+          <div className="text-center py-16 px-4 bg-[#130324]/40 rounded-3xl border border-dashed border-purple-500/20">
+            <User className="w-10 h-10 text-purple-400/40 mx-auto mb-2" />
+            <h3 className="text-base font-semibold text-white">No customers found</h3>
+            <p className="text-xs text-purple-200/60 max-w-sm mx-auto mb-4 mt-1">
+              No matching records for "{searchQuery}". You can create a new customer now.
             </p>
             <button
               onClick={onOpenNewCustomerModal}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gold-500 hover:bg-gold-400 text-purple-950 font-black text-sm shadow-gold-glow transition-all"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-gold-500 hover:bg-gold-400 text-purple-950 font-bold text-xs shadow-gold-glow transition-all"
             >
-              <PlusCircle className="w-4 h-4" />
+              <Plus className="w-4 h-4" />
               <span>Add New Customer</span>
             </button>
           </div>

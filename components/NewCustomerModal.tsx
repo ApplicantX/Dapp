@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Customer, ParsedCustomerVoice } from '@/lib/types';
 import { ContinuousSpeechEngine } from '@/lib/speechEngine';
-import { parseBulkCustomersVoice, parseSingleCustomerVoice } from '@/lib/voiceParser';
+import { parseBulkCustomersVoice } from '@/lib/voiceParser';
 import {
   X,
   Mic,
@@ -13,9 +13,6 @@ import {
   Trash2,
   CheckCircle2,
   AlertCircle,
-  BookOpen,
-  MapPin,
-  Phone,
   Sparkles,
 } from 'lucide-react';
 
@@ -117,10 +114,9 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
   const handleSaveAllBatch = () => {
     if (parsedCards.length === 0) return;
 
-    // Validate each customer card
     const invalid = parsedCards.find((c) => !c.name.trim() || !c.village.trim() || !c.pageNumber.trim());
     if (invalid) {
-      alert(`Please fill in the missing Name, Village, or Page Number for "${invalid.name || 'Customer'}" before saving.`);
+      alert(`Please fill in Name, Village, and Page Number for "${invalid.name || 'Customer'}" before saving.`);
       return;
     }
 
@@ -173,172 +169,170 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-purple-950/85 backdrop-blur-md overflow-y-auto">
-      <div className="relative w-full max-w-3xl bg-gradient-to-b from-purple-900 via-purple-950 to-purple-950 border-2 border-gold-500/50 rounded-3xl p-6 sm:p-8 shadow-royal my-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0a0114]/80 backdrop-blur-md overflow-y-auto">
+      <div className="relative w-full max-w-2xl bg-[#130324] border border-purple-500/20 rounded-3xl p-6 sm:p-8 shadow-modal my-6">
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-2.5 rounded-full bg-purple-800/80 hover:bg-purple-700 text-purple-200 hover:text-white border border-purple-600/40 transition-all"
+          className="absolute top-5 right-5 p-2 rounded-full bg-purple-900/40 hover:bg-purple-800 text-purple-200 hover:text-white transition-all"
         >
-          <X className="w-6 h-6" />
+          <X className="w-5 h-5" />
         </button>
 
         {/* Modal Header */}
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-12 h-12 rounded-2xl bg-gold-500/20 border border-gold-400/50 flex items-center justify-center text-gold-300">
-            <User className="w-6 h-6" />
+          <div className="w-10 h-10 rounded-2xl bg-gold-500/10 border border-gold-400/30 flex items-center justify-center text-gold-400">
+            <User className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-white tracking-tight">
-              Add Customer Account (નવું ગ્રાહક ખાતું)
+            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+              Add Customer Account
             </h2>
-            <p className="text-xs sm:text-sm text-purple-200 font-medium">
-              Voice-first or manual entry with physical diary & page reference.
+            <p className="text-xs text-purple-200/60 font-medium">
+              Voice-first or manual entry with physical diary reference.
             </p>
           </div>
         </div>
 
-        {/* Mode Tabs (Voice vs Manual) */}
-        <div className="flex items-center gap-2 mb-6 bg-purple-900/90 p-1 rounded-2xl border border-purple-700">
+        {/* Mode Tabs (Google Pill Style) */}
+        <div className="flex items-center gap-1 mb-6 bg-[#1c0733] p-1 rounded-full border border-purple-500/15">
           <button
             type="button"
             onClick={() => setActiveTab('VOICE')}
-            className={`flex-1 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all ${
+            className={`flex-1 py-2 rounded-full font-bold text-xs flex items-center justify-center gap-2 transition-all ${
               activeTab === 'VOICE'
                 ? 'bg-gold-500 text-purple-950 shadow-gold-glow'
-                : 'text-purple-300 hover:text-white'
+                : 'text-purple-200/60 hover:text-white'
             }`}
           >
-            <Mic className="w-4 h-4" />
+            <Mic className="w-3.5 h-3.5" />
             <span>Voice Entry (Single or Bulk)</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('MANUAL')}
-            className={`flex-1 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all ${
+            className={`flex-1 py-2 rounded-full font-bold text-xs flex items-center justify-center gap-2 transition-all ${
               activeTab === 'MANUAL'
                 ? 'bg-gold-500 text-purple-950 shadow-gold-glow'
-                : 'text-purple-300 hover:text-white'
+                : 'text-purple-200/60 hover:text-white'
             }`}
           >
             <span>Manual Form</span>
           </button>
         </div>
 
-        {/* VOICE TAB CONTENT */}
+        {/* VOICE TAB */}
         {activeTab === 'VOICE' && (
-          <div className="space-y-6">
-            {/* Center Giant Microphone / STOP Button */}
-            <div className="flex flex-col items-center justify-center py-4 bg-purple-950/70 rounded-3xl border border-purple-800">
+          <div className="space-y-5">
+            {/* Center Microphone Button */}
+            <div className="flex flex-col items-center justify-center py-6 bg-[#1c0733]/60 rounded-3xl border border-purple-500/15">
               <button
                 type="button"
                 onClick={isRecording ? stopRecording : startRecording}
-                className={`relative w-28 h-28 rounded-full flex flex-col items-center justify-center border-4 transition-all transform active:scale-95 ${
+                className={`relative w-24 h-24 rounded-full flex flex-col items-center justify-center border-2 transition-all transform active:scale-95 ${
                   isRecording
-                    ? 'bg-rose-600 border-gold-300 shadow-[0_0_40px_rgba(225,29,72,0.7)] animate-pulse'
+                    ? 'bg-rose-600 border-rose-300 text-white shadow-[0_0_30px_rgba(225,29,72,0.6)] animate-pulse'
                     : 'bg-gradient-to-tr from-purple-700 via-purple-600 to-gold-500 border-gold-400 shadow-purple-glow hover:scale-105'
                 }`}
               >
                 {isRecording ? (
                   <>
-                    <MicOff className="w-10 h-10 text-white animate-bounce" />
-                    <span className="text-xs font-black uppercase text-white mt-1">STOP</span>
+                    <MicOff className="w-8 h-8 text-white animate-bounce" />
+                    <span className="text-[10px] font-bold uppercase text-white mt-1">STOP</span>
                   </>
                 ) : (
                   <>
-                    <Mic className="w-10 h-10 text-white" />
-                    <span className="text-xs font-black uppercase text-gold-200 mt-1">TAP & SPEAK</span>
+                    <Mic className="w-8 h-8 text-white" />
+                    <span className="text-[10px] font-bold uppercase text-gold-200 mt-1">SPEAK</span>
                   </>
                 )}
               </button>
 
-              <p className="text-xs sm:text-sm font-semibold text-purple-200 mt-3 text-center px-4">
+              <p className="text-xs font-medium text-purple-200/70 mt-3 text-center px-4 max-w-md">
                 {isRecording
-                  ? 'Continuous listening... Speak one or multiple customers. Press STOP when done.'
-                  : 'Tap the microphone and speak: "Ramesh Mishra from Vova village, Diary 2026, Page 142"'}
+                  ? 'Listening continuously... Speak one or multiple customers. Tap STOP when finished.'
+                  : 'Tap and speak: "Ramesh Mishra from Vova village, Diary 2026, Page 142"'}
               </p>
             </div>
 
             {/* Live Transcript Display */}
             {liveTranscript && (
-              <div className="bg-purple-900/80 p-4 rounded-2xl border border-gold-500/30 text-xs">
-                <span className="font-bold text-gold-300 uppercase tracking-wider block mb-1">
-                  Raw Voice Transcript:
+              <div className="bg-[#1c0733] p-3.5 rounded-2xl border border-purple-500/20 text-xs">
+                <span className="font-semibold text-gold-300 uppercase tracking-wider block text-[10px] mb-0.5">
+                  Voice Transcript:
                 </span>
-                <p className="text-sm font-bold text-white italic">"{liveTranscript}"</p>
+                <p className="text-xs font-medium text-white italic">"{liveTranscript}"</p>
               </div>
             )}
 
             {/* Parsed Numbered Customer Cards */}
             {parsedCards.length > 0 && (
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gold-300 uppercase tracking-wider flex items-center gap-1">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Parsed Customers ({parsedCards.length}) - Review & Edit:</span>
-                  </span>
-                </div>
+                <span className="text-xs font-bold text-gold-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-gold-400" />
+                  <span>Parsed Customers ({parsedCards.length})</span>
+                </span>
 
-                <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
                   {parsedCards.map((card, idx) => (
                     <div
                       key={idx}
-                      className="bg-purple-900/80 p-4 rounded-2xl border border-purple-700 shadow-sm space-y-3"
+                      className="bg-[#1c0733] p-3.5 rounded-2xl border border-purple-500/15 space-y-2 text-xs"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-gold-300 bg-gold-500/20 px-2 py-0.5 rounded">
+                        <span className="text-[10px] font-bold text-gold-300 bg-gold-500/10 px-2 py-0.5 rounded-full">
                           Customer #{idx + 1}
                         </span>
                         {parsedCards.length > 1 && (
                           <button
                             type="button"
                             onClick={() => removeParsedCard(idx)}
-                            className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1 font-bold"
+                            className="text-[11px] text-rose-400 hover:text-rose-300 flex items-center gap-1 font-semibold"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3 h-3" />
                             <span>Remove</span>
                           </button>
                         )}
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
                         <div>
-                          <label className="text-[11px] font-bold text-purple-200 block mb-1">Name</label>
+                          <label className="text-[10px] font-medium text-purple-200/60 block mb-1">Name</label>
                           <input
                             type="text"
                             value={card.name}
                             onChange={(e) => updateParsedCard(idx, { name: e.target.value })}
-                            className="w-full px-3 py-1.5 rounded-xl bg-purple-950 border border-purple-700 text-white font-bold"
+                            className="w-full px-2.5 py-1.5 rounded-xl bg-[#130324] border border-purple-500/20 text-white font-bold text-xs"
                           />
                         </div>
 
                         <div>
-                          <label className="text-[11px] font-bold text-purple-200 block mb-1">Village</label>
+                          <label className="text-[10px] font-medium text-purple-200/60 block mb-1">Village</label>
                           <input
                             type="text"
                             value={card.village}
                             onChange={(e) => updateParsedCard(idx, { village: e.target.value })}
-                            className="w-full px-3 py-1.5 rounded-xl bg-purple-950 border border-purple-700 text-gold-200 font-bold"
+                            className="w-full px-2.5 py-1.5 rounded-xl bg-[#130324] border border-purple-500/20 text-gold-200 font-bold text-xs"
                           />
                         </div>
 
                         <div>
-                          <label className="text-[11px] font-bold text-purple-200 block mb-1">Diary</label>
+                          <label className="text-[10px] font-medium text-purple-200/60 block mb-1">Diary</label>
                           <input
                             type="text"
                             value={card.diary}
                             onChange={(e) => updateParsedCard(idx, { diary: e.target.value })}
-                            className="w-full px-3 py-1.5 rounded-xl bg-purple-950 border border-purple-700 text-white font-semibold"
+                            className="w-full px-2.5 py-1.5 rounded-xl bg-[#130324] border border-purple-500/20 text-white text-xs"
                           />
                         </div>
 
                         <div>
-                          <label className="text-[11px] font-bold text-purple-200 block mb-1">Page Number</label>
+                          <label className="text-[10px] font-medium text-purple-200/60 block mb-1">Page Number</label>
                           <input
                             type="text"
                             value={card.pageNumber}
                             onChange={(e) => updateParsedCard(idx, { pageNumber: e.target.value })}
-                            className="w-full px-3 py-1.5 rounded-xl bg-purple-950 border-2 border-gold-500/60 text-gold-300 font-black text-sm"
+                            className="w-full px-2.5 py-1.5 rounded-xl bg-[#130324] border border-gold-500/40 text-gold-300 font-bold text-xs"
                           />
                         </div>
                       </div>
@@ -346,22 +340,22 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
                   ))}
                 </div>
 
-                {/* Save All Customers Action */}
-                <div className="flex items-center justify-end gap-3 pt-3">
+                {/* Save All Action */}
+                <div className="flex items-center justify-end gap-2 pt-2">
                   <button
                     type="button"
                     onClick={onClose}
-                    className="px-4 py-2.5 rounded-xl bg-purple-900 hover:bg-purple-800 text-purple-200 font-bold text-xs"
+                    className="px-4 py-2 rounded-full text-purple-200/70 hover:text-white font-medium text-xs"
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
                     onClick={handleSaveAllBatch}
-                    className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-300 text-purple-950 font-black text-sm shadow-gold-glow transition-all active:scale-95"
+                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-gold-500 hover:bg-gold-400 text-purple-950 font-bold text-xs shadow-gold-glow transition-all"
                   >
-                    <CheckCircle2 className="w-5 h-5" />
-                    <span>SAVE ALL {parsedCards.length} CUSTOMER{parsedCards.length > 1 ? 'S' : ''}</span>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Save {parsedCards.length} Customer{parsedCards.length > 1 ? 's' : ''}</span>
                   </button>
                 </div>
               </div>
@@ -369,20 +363,20 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
           </div>
         )}
 
-        {/* MANUAL FORM TAB CONTENT */}
+        {/* MANUAL TAB */}
         {activeTab === 'MANUAL' && (
           <form onSubmit={handleSaveManual} className="space-y-4">
             {validationError && (
-              <div className="p-3 rounded-xl bg-rose-950/80 border border-rose-500 text-rose-200 text-xs font-bold flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-rose-400" />
+              <div className="p-3 rounded-2xl bg-rose-950/40 border border-rose-500/30 text-rose-200 text-xs font-medium flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
                 <span>{validationError}</span>
               </div>
             )}
 
-            {/* Customer Name */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-purple-200">
-                Customer Name (ગ્રાહકનું નામ) <span className="text-rose-400">*</span>
+            {/* Name */}
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-purple-200/80">
+                Customer Name <span className="text-rose-400">*</span>
               </label>
               <input
                 type="text"
@@ -390,20 +384,20 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Ramesh Mishra"
-                className="w-full px-4 py-3 rounded-xl bg-purple-900 border-2 border-purple-700 focus:border-gold-400 text-white font-bold text-base focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-[#1c0733] border border-purple-500/20 focus:border-gold-400/60 text-white font-bold text-sm focus:outline-none"
               />
             </div>
 
-            {/* Village Dropdown + Custom Add */}
-            <div className="space-y-1.5">
+            {/* Village */}
+            <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-purple-200">
+                <label className="text-xs font-semibold text-purple-200/80">
                   Village (ગામ) <span className="text-rose-400">*</span>
                 </label>
                 <button
                   type="button"
                   onClick={() => setIsCustomVillage(!isCustomVillage)}
-                  className="text-xs font-bold text-gold-300 hover:underline"
+                  className="text-[11px] font-semibold text-gold-400 hover:underline"
                 >
                   {isCustomVillage ? 'Choose from list' : '+ Enter new village'}
                 </button>
@@ -416,13 +410,13 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
                   value={customVillage}
                   onChange={(e) => setCustomVillage(e.target.value)}
                   placeholder="Enter new village name..."
-                  className="w-full px-4 py-3 rounded-xl bg-purple-900 border-2 border-gold-400 text-gold-200 font-bold text-base focus:outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[#1c0733] border border-gold-400 text-gold-200 font-bold text-sm focus:outline-none"
                 />
               ) : (
                 <select
                   value={village}
                   onChange={(e) => setVillage(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-purple-900 border-2 border-purple-700 focus:border-gold-400 text-white font-bold text-base focus:outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[#1c0733] border border-purple-500/20 focus:border-gold-400/60 text-white font-bold text-sm focus:outline-none"
                 >
                   {villages.map((v) => (
                     <option key={v} value={v}>
@@ -433,10 +427,10 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
               )}
             </div>
 
-            {/* Diary & Page Number */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-purple-200">
+            {/* Diary & Page */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-purple-200/80">
                   Diary Reference <span className="text-rose-400">*</span>
                 </label>
                 <input
@@ -445,13 +439,13 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
                   value={diary}
                   onChange={(e) => setDiary(e.target.value)}
                   placeholder="e.g. Diary 2026"
-                  className="w-full px-4 py-3 rounded-xl bg-purple-900 border border-purple-700 text-white font-bold text-sm focus:outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[#1c0733] border border-purple-500/20 text-white font-semibold text-xs focus:outline-none"
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gold-300">
-                  Page Number (પાના નંબર) <span className="text-rose-400">*</span>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-gold-300">
+                  Page Number <span className="text-rose-400">*</span>
                 </label>
                 <input
                   type="text"
@@ -459,38 +453,38 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
                   value={pageNumber}
                   onChange={(e) => setPageNumber(e.target.value)}
                   placeholder="e.g. 142"
-                  className="w-full px-4 py-3 rounded-xl bg-purple-900 border-2 border-gold-500 text-gold-300 font-black text-lg focus:outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[#1c0733] border border-gold-500/40 text-gold-300 font-bold text-sm focus:outline-none"
                 />
               </div>
             </div>
 
-            {/* Mobile (Optional) */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-purple-200">Mobile Number (Optional)</label>
+            {/* Mobile */}
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-purple-200/70">Mobile Number (Optional)</label>
               <input
                 type="tel"
                 value={mobile}
                 onChange={(e) => setMobile(e.target.value)}
                 placeholder="e.g. 9825123456"
-                className="w-full px-4 py-2.5 rounded-xl bg-purple-900 border border-purple-700 text-white font-medium text-sm focus:outline-none"
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-[#1c0733] border border-purple-500/20 text-white text-xs focus:outline-none"
               />
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-3">
+            <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2.5 rounded-xl bg-purple-900 hover:bg-purple-800 text-purple-200 font-bold text-xs"
+                className="px-4 py-2 rounded-full text-purple-200/70 hover:text-white font-medium text-xs"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-gold-500 to-gold-400 hover:from-gold-400 hover:to-gold-300 text-purple-950 font-black text-sm shadow-gold-glow transition-all active:scale-95"
+                className="flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-gold-500 hover:bg-gold-400 text-purple-950 font-bold text-xs shadow-gold-glow transition-all"
               >
-                <CheckCircle2 className="w-5 h-5" />
-                <span>Save Customer (ખાતું બનાવો)</span>
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Save Customer</span>
               </button>
             </div>
           </form>

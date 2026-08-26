@@ -39,7 +39,7 @@ export interface ActivityLog {
   id: string;
   timestamp: string;
   user: string;
-  action: 'CREATE_CUSTOMER' | 'EDIT_CUSTOMER' | 'ADD_LOAN' | 'EDIT_LOAN' | 'CLOSE_LOAN' | 'DELETE_LOAN' | 'MOVE_DIARY_PAGE';
+  action: 'CREATE_CUSTOMER' | 'EDIT_CUSTOMER' | 'ADD_LOAN' | 'EDIT_LOAN' | 'CLOSE_LOAN' | 'DELETE_LOAN' | 'MOVE_DIARY_PAGE' | 'BULK_IMPORT';
   customerName: string;
   village: string;
   details: string;
@@ -85,8 +85,25 @@ export interface CalculatorItem {
   startDate: string;
   endDate: string;
   annualRate: number;
-  // Computed values
   yearsElapsed: number;
   interestAmount: number;
   totalAmount: number;
+}
+
+export interface BulkCustomerLoanRecord {
+  id: string;
+  name: string;
+  village: string;
+  diary: string;
+  pageNumber: string;
+  mobile?: string;
+  loanAmount: number;
+  metal: MetalType;
+  category: string;
+  weight: number;
+  quantity: number;
+  notes?: string;
+  rawSpeech: string;
+  status: 'VALID' | 'WARNING';
+  warningMessage?: string;
 }

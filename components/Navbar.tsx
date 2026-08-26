@@ -1,11 +1,11 @@
 'use client';
 
 import React from 'react';
-import { Gem, Calculator, Users, FileSpreadsheet, History, Home } from 'lucide-react';
+import { Gem, Calculator, Users, FileSpreadsheet, History, Home, Mic } from 'lucide-react';
 
 interface NavbarProps {
-  currentView: 'HOME' | 'CUSTOMERS' | 'CALCULATOR';
-  onNavigate: (view: 'HOME' | 'CUSTOMERS' | 'CALCULATOR') => void;
+  currentView: 'HOME' | 'CUSTOMERS' | 'CALCULATOR' | 'BULK_INPUT';
+  onNavigate: (view: 'HOME' | 'CUSTOMERS' | 'CALCULATOR' | 'BULK_INPUT') => void;
   onOpenExportModal: () => void;
   onOpenHistoryModal: () => void;
 }
@@ -17,85 +17,104 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenHistoryModal,
 }) => {
   return (
-    <header className="sticky top-0 z-40 bg-purple-950/95 backdrop-blur-md border-b border-purple-800/80 shadow-royal">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-40 bg-[#0d011a]/85 backdrop-blur-xl border-b border-purple-500/10 shadow-card">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
-          {/* Store Branding (Gold Lettering) */}
+          {/* Minimal Luxury Logo */}
           <div
             onClick={() => onNavigate('HOME')}
-            className="cursor-pointer flex items-center gap-3.5 group"
+            className="cursor-pointer flex items-center gap-3.5 group select-none"
           >
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-gold-400 via-gold-500 to-purple-900 border-2 border-gold-300 flex items-center justify-center text-purple-950 shadow-gold-glow group-hover:scale-105 transition-transform">
-              <Gem className="w-7 h-7 fill-purple-950/20" />
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-gold-400 via-gold-500 to-purple-900 border border-gold-300/60 flex items-center justify-center text-[#0a0114] shadow-gold-glow group-hover:scale-105 transition-all duration-300">
+              <Gem className="w-6 h-6 fill-current opacity-90" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-extrabold tracking-wide bg-gradient-to-r from-gold-300 via-gold-400 to-purple-200 bg-clip-text text-transparent uppercase font-serif">
-                Dahod Jewellery
-              </h1>
-              <p className="text-[11px] text-purple-300 font-semibold tracking-wider">
-                Gold & Silver Lending • Girvi Khata
+              <div className="flex items-center gap-2">
+                <span className="text-xl font-bold tracking-tight text-white font-serif">
+                  Dahod Jewellery
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-gold-500/10 text-gold-300 border border-gold-500/20">
+                  Lending
+                </span>
+              </div>
+              <p className="text-xs text-purple-200/60 font-medium">
+                Gold & Silver Diary Ledger
               </p>
             </div>
           </div>
 
-          {/* Navigation Links */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Home / Starting Screen */}
-            <button
-              onClick={() => onNavigate('HOME')}
-              className={`p-2.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all ${
-                currentView === 'HOME'
-                  ? 'bg-gold-500 text-purple-950 shadow-gold-glow'
-                  : 'bg-purple-900/60 hover:bg-purple-900 text-purple-200 hover:text-white border border-purple-700/60'
-              }`}
-            >
-              <Home className="w-4 h-4" />
-              <span className="hidden sm:inline">Home</span>
-            </button>
+          {/* Google-Style Pill Navigation */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <nav className="flex items-center bg-purple-900/40 p-1.5 rounded-full border border-purple-500/15">
+              <button
+                onClick={() => onNavigate('HOME')}
+                className={`px-3.5 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 ${
+                  currentView === 'HOME'
+                    ? 'bg-gold-500 text-purple-950 shadow-gold-glow font-bold'
+                    : 'text-purple-200/70 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <Home className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Home</span>
+              </button>
 
-            {/* Customer Details */}
-            <button
-              onClick={() => onNavigate('CUSTOMERS')}
-              className={`p-2.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all ${
-                currentView === 'CUSTOMERS'
-                  ? 'bg-gold-500 text-purple-950 shadow-gold-glow'
-                  : 'bg-purple-900/60 hover:bg-purple-900 text-purple-200 hover:text-white border border-purple-700/60'
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              <span className="hidden sm:inline">Customer Details</span>
-            </button>
+              <button
+                onClick={() => onNavigate('BULK_INPUT')}
+                className={`px-3.5 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 ${
+                  currentView === 'BULK_INPUT'
+                    ? 'bg-gold-500 text-purple-950 shadow-gold-glow font-bold'
+                    : 'text-gold-300/90 hover:text-gold-200 hover:bg-white/5'
+                }`}
+              >
+                <Mic className="w-3.5 h-3.5" />
+                <span>Data Input (500+)</span>
+              </button>
 
-            {/* Compound Interest Calculator */}
-            <button
-              onClick={() => onNavigate('CALCULATOR')}
-              className={`p-2.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all ${
-                currentView === 'CALCULATOR'
-                  ? 'bg-gold-500 text-purple-950 shadow-gold-glow'
-                  : 'bg-purple-900/60 hover:bg-purple-900 text-purple-200 hover:text-white border border-purple-700/60'
-              }`}
-            >
-              <Calculator className="w-4 h-4" />
-              <span className="hidden sm:inline">Calculator</span>
-            </button>
+              <button
+                onClick={() => onNavigate('CUSTOMERS')}
+                className={`px-3.5 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 ${
+                  currentView === 'CUSTOMERS'
+                    ? 'bg-gold-500 text-purple-950 shadow-gold-glow font-bold'
+                    : 'text-purple-200/70 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Customers</span>
+              </button>
 
-            {/* Export */}
-            <button
-              onClick={onOpenExportModal}
-              className="p-2.5 rounded-xl bg-purple-900/60 hover:bg-purple-800 text-gold-300 border border-purple-700/60 transition-all"
-              title="Export to Excel & Backup"
-            >
-              <FileSpreadsheet className="w-5 h-5" />
-            </button>
+              <button
+                onClick={() => onNavigate('CALCULATOR')}
+                className={`px-3.5 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 ${
+                  currentView === 'CALCULATOR'
+                    ? 'bg-gold-500 text-purple-950 shadow-gold-glow font-bold'
+                    : 'text-purple-200/70 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <Calculator className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Calculator</span>
+              </button>
+            </nav>
 
-            {/* History */}
-            <button
-              onClick={onOpenHistoryModal}
-              className="p-2.5 rounded-xl bg-purple-900/60 hover:bg-purple-800 text-purple-200 hover:text-white border border-purple-700/60 transition-all"
-              title="Activity & Audit History"
-            >
-              <History className="w-5 h-5" />
-            </button>
+            <div className="h-6 w-px bg-purple-500/20 mx-1 hidden sm:block" />
+
+            {/* Utility Actions */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={onOpenExportModal}
+                className="p-2.5 rounded-full bg-purple-900/30 hover:bg-purple-800/50 text-gold-300 hover:text-gold-200 border border-gold-500/20 transition-all duration-200"
+                title="Export Excel & Backup"
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={onOpenHistoryModal}
+                className="p-2.5 rounded-full bg-purple-900/30 hover:bg-purple-800/50 text-purple-200/70 hover:text-white border border-purple-500/20 transition-all duration-200"
+                title="Activity & Audit History"
+              >
+                <History className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
