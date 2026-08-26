@@ -1,15 +1,34 @@
 'use client';
 
-export interface CustomAudioCallbacks {
+export interface SpeechCallbacks {
   onStart?: () => void;
   onEnd?: () => void;
-  onInterimResult?: (text: string) => void;
-  onFinalResult?: (text: string) => void;
+  onInterimResult?: (transcript: string) => void;
+  onFinalResult?: (transcript: string) => void;
   onError?: (error: string) => void;
   onAudioLevel?: (level: number) => void;
 }
 
-export class CustomDirectAudioEngine {
+// Filter known silence hallucinations
+export function sanitizeTranscript(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/thank you for watching\.?/gi, '')
+    .replace(/thanks for watching\.?/gi, '')
+    .replace(/please subscribe\.?/gi, '')
+    .replace(/subtitles by.*$/gi, '')
+    .replace(/translated by.*$/gi, '')
+    .replace(/amara\.org/gi, '')
+    .replace(/watching!/gi, '')
+    .replace(/\[music\]/gi, '')
+    .replace(/\(music\)/gi, '')
+    .replace(/\[silence\]/gi, '')
+    .replace(/\[applause\]/gi, '')
+    .replace(/\(silence\)/gi, '')
+    .trim();
+}
+
+export class CustomHybridSpeechEngine {
   private mediaRecorder: MediaRecorder | null = null;
   private audioChunks: Blob[] = [];
   private audioContext: AudioContext | null = null;
@@ -18,22 +37,41 @@ export class CustomDirectAudioEngine {
   private stream: MediaStream | null = null;
   private animFrameId: number | null = null;
   private isRecording: boolean = false;
-  private callbacks: CustomAudioCallbacks = {};
-  private language: string = 'en';
+  private callbacks: SpeechCallbacks = {};
+  private language: string = 'en-IN';
 
-  constructor(language: string = 'en') {
+  // Parallel live recognition
+  private recognition: any = null;
+  private liveRealtimeText: string = '';
+
+  constructor(language: string = 'en-IN') {
     this.language = language;
+    if (typeof window !== 'undefined') {
+      const SpeechRec =
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRec) {
+        this.recognition = new SpeechRec();
+        this.recognition.continuous = true;
+        this.recognition.interimResults = true;
+        this.recognition.lang = language;
+      }
+    }
   }
 
   setLanguage(lang: string) {
     this.language = lang;
+    if (this.recognition) {
+      this.recognition.lang = lang;
+    }
   }
 
-  async start(callbacks: CustomAudioCallbacks): Promise<void> {
+  async start(callbacks: SpeechCallbacks): Promise<void> {
     this.callbacks = callbacks;
     this.audioChunks = [];
+    this.liveRealtimeText = '';
     this.isRecording = true;
 
+    // 1. Start Web Audio Stream & Visualizer
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -44,7 +82,6 @@ export class CustomDirectAudioEngine {
       });
       this.stream = stream;
 
-      // Real-time audio waveform level
       const AudioCtx =
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -71,7 +108,7 @@ export class CustomDirectAudioEngine {
         checkLevel();
       }
 
-      // MediaRecorder for raw audio chunks
+      // 2. Start MediaRecorder for Whisper AI Audio Blob
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : MediaRecorder.isTypeSupported('audio/webm')
@@ -84,14 +121,36 @@ export class CustomDirectAudioEngine {
           this.audioChunks.push(event.data);
         }
       };
-
       this.mediaRecorder.start(100);
+
+      // 3. Start parallel live recognition for real-time visual feedback
+      if (this.recognition) {
+        this.recognition.onresult = (event: any) => {
+          let fullText = '';
+          for (let i = 0; i < event.results.length; ++i) {
+            fullText += event.results[i][0].transcript + ' ';
+          }
+          this.liveRealtimeText = sanitizeTranscript(fullText);
+          callbacks.onInterimResult?.(this.liveRealtimeText);
+        };
+
+        this.recognition.onerror = (event: any) => {
+          if (event.error !== 'no-speech') {
+            console.warn('Live recognition error:', event.error);
+          }
+        };
+
+        try {
+          this.recognition.start();
+        } catch (e) {}
+      }
+
       callbacks.onStart?.();
     } catch (err: any) {
       this.isRecording = false;
-      console.error('Audio recording start error:', err);
+      console.error('Audio start error:', err);
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        callbacks.onError?.('Microphone permission denied. Please allow microphone access in your browser.');
+        callbacks.onError?.('Microphone access denied. Please click the camera/mic icon in the browser address bar to allow microphone access.');
       } else {
         callbacks.onError?.(err.message || 'Failed to start microphone recording.');
       }
@@ -111,10 +170,19 @@ export class CustomDirectAudioEngine {
       this.audioContext = null;
     }
 
+    if (this.recognition) {
+      try {
+        this.recognition.stop();
+      } catch (e) {}
+    }
+
     return new Promise((resolve) => {
+      const fallbackText = this.liveRealtimeText.trim();
+
       if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') {
         this.cleanup();
-        resolve('');
+        this.callbacks.onFinalResult?.(fallbackText);
+        resolve(fallbackText);
         return;
       }
 
@@ -123,39 +191,40 @@ export class CustomDirectAudioEngine {
         const audioBlob = new Blob(this.audioChunks, { type: mimeType });
         this.cleanup();
 
-        try {
-          this.callbacks.onInterimResult?.('Transcribing audio with Whisper AI...');
+        const keyToUse = apiKey || (typeof window !== 'undefined' ? localStorage.getItem('dahod_whisper_api_key') || '' : '');
 
-          const formData = new FormData();
-          formData.append('audio', audioBlob);
-          const keyToUse = apiKey || (typeof window !== 'undefined' ? localStorage.getItem('dahod_whisper_api_key') || '' : '');
-          if (keyToUse) {
+        // If Whisper API key is available, call Whisper
+        if (keyToUse) {
+          try {
+            this.callbacks.onInterimResult?.('Transcribing audio with Whisper AI...');
+
+            const formData = new FormData();
+            formData.append('audio', audioBlob);
             formData.append('apiKey', keyToUse);
             formData.append('service', keyToUse.startsWith('gsk_') ? 'groq' : 'openai');
-          }
-          formData.append('language', this.language);
+            formData.append('language', this.language.startsWith('gu') ? 'gu' : this.language.startsWith('hi') ? 'hi' : 'en');
 
-          const res = await fetch('/api/transcribe', {
-            method: 'POST',
-            body: formData,
-          });
+            const res = await fetch('/api/transcribe', {
+              method: 'POST',
+              body: formData,
+            });
 
-          if (res.ok) {
-            const data = await res.json();
-            const transcript = data.transcript || '';
-            this.callbacks.onFinalResult?.(transcript);
-            resolve(transcript);
-            return;
-          } else {
-            const err = await res.json();
-            this.callbacks.onError?.(err.message || 'Transcription failed.');
-            resolve('');
+            if (res.ok) {
+              const data = await res.json();
+              const transcript = sanitizeTranscript(data.transcript || '');
+              const finalResult = transcript || fallbackText;
+              this.callbacks.onFinalResult?.(finalResult);
+              resolve(finalResult);
+              return;
+            }
+          } catch (e) {
+            console.warn('Whisper API call failed, using live stream text:', e);
           }
-        } catch (e: any) {
-          console.error('Transcription request error:', e);
-          this.callbacks.onError?.('Failed to reach transcription server.');
-          resolve('');
         }
+
+        // Return real-time fallback text
+        this.callbacks.onFinalResult?.(fallbackText);
+        resolve(fallbackText);
       };
 
       this.mediaRecorder.stop();
@@ -170,3 +239,6 @@ export class CustomDirectAudioEngine {
     this.callbacks.onEnd?.();
   }
 }
+
+// Export alias for compatibility
+export { CustomHybridSpeechEngine as CustomDirectAudioEngine };

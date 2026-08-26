@@ -72,7 +72,7 @@ export function parseSingleCustomerVoice(rawText: string, knownVillages: string[
   }
 
   // Extract Page Number: e.g. "Page 142", "Page number 142", "પાના નંબર 142", "પાનું 142"
-  const pageMatch = text.match(/(?:page|page number|p\.|પાના નંબર|પાનું|પેજ|पृष्ठ|पन्ना)\s*(?:no\.?|number)?\s*(\d+)/i);
+  const pageMatch = text.match(/(?:page|page number|p\.|પાના નંબર|પાનું|પેજ|પાનુ|पृष्ठ|पन्ना)\s*(?:no\.?|number)?\s*(\d+)/i);
   if (pageMatch) {
     pageNumber = pageMatch[1];
   } else {
@@ -95,7 +95,7 @@ export function parseSingleCustomerVoice(rawText: string, knownVillages: string[
     const vMatch = text.match(pat);
     if (vMatch && vMatch[1]) {
       const candidate = vMatch[1].trim();
-      const ignoredWords = ['diary', 'page', 'mobile', 'phone', 'customer', 'new', 'add', 'no', 'number'];
+      const ignoredWords = ['diary', 'page', 'mobile', 'phone', 'customer', 'new', 'add', 'no', 'number', 'loan', 'rupees', 'gold', 'silver'];
       if (!ignoredWords.includes(candidate.toLowerCase())) {
         village = candidate.charAt(0).toUpperCase() + candidate.slice(1);
         break;
@@ -120,7 +120,7 @@ export function parseSingleCustomerVoice(rawText: string, knownVillages: string[
       nameText = nameText.substring(0, vIdx);
     }
   }
-  const markers = ['from', 'village', 'diary', 'page', 'mobile', 'ગામ', 'ચોપડો', 'પાના', 'ડાયરી', 'loan', 'rupees'];
+  const markers = ['from', 'village', 'diary', 'page', 'mobile', 'ગામ', 'ચોપડો', 'પાના', 'ડાયરી', 'loan', 'rupees', 'રૂપિયા', 'gold', 'silver', 'સોનું', 'ચાંદી'];
   for (const m of markers) {
     const mIdx = nameText.toLowerCase().indexOf(m);
     if (mIdx > 0) {
@@ -129,7 +129,7 @@ export function parseSingleCustomerVoice(rawText: string, knownVillages: string[
   }
 
   name = nameText
-    .replace(/(?:customer|new customer|add customer|name is|શ્રી|નામ)/gi, '')
+    .replace(/(?:customer|new customer|add customer|name is|શ્રી|નામ|\b\d+[\.\)]|\bno\.?\s*\d+)/gi, '')
     .replace(/[^A-Za-z\u0A80-\u0AFF\u0900-\u097F\s]/g, '')
     .trim();
 
@@ -141,7 +141,7 @@ export function parseSingleCustomerVoice(rawText: string, knownVillages: string[
   }
 
   return {
-    name: name || 'Unknown Customer',
+    name: name || 'Customer',
     village: village || 'Dahod',
     diary: diary || 'Diary 2026',
     pageNumber: pageNumber || '1',
@@ -163,7 +163,7 @@ export function parseBulkCustomersVoice(rawText: string, knownVillages: string[]
 
   const cleanedSegments = segments
     .map((s) => s.trim())
-    .filter((s) => s.length > 5);
+    .filter((s) => s.length > 2);
 
   if (cleanedSegments.length === 0) {
     return [parseSingleCustomerVoice(rawText, knownVillages)];
@@ -172,7 +172,7 @@ export function parseBulkCustomersVoice(rawText: string, knownVillages: string[]
   return cleanedSegments.map((seg) => parseSingleCustomerVoice(seg, knownVillages));
 }
 
-// 3. High-Throughput Bulk Voice to Excel Parser (for 500+ Continuous Input)
+// 3. High-Throughput Bulk Voice to Excel Parser
 export function parseBulkVoiceToExcelRecords(
   rawText: string,
   knownVillages: string[] = [],
@@ -182,20 +182,20 @@ export function parseBulkVoiceToExcelRecords(
 
   const text = rawText.trim();
 
-  // Split massive stream by numbered delimiters or boundary phrases
-  // e.g. "1. Ramesh Patel...", "2. Suresh...", "Customer 3:", "next customer:", "નંબર ૧", "નંબર ૨"
+  // Split by numbered items, commas between full names, semicolons, newlines, or "next"
   const splitPattern = /(?:\b\d+[\.\)]|\bCustomer\s*\d+:?|\bનંબર\s*\d+:?|\bnumber\s*\d+:?|\bnext\s*customer:?|\bnext:|\band\s+next:?|\bપછી:?|\bબીજો\s*ગ્રાહક:?)/i;
   
   let rawSegments = text.split(splitPattern);
 
   if (rawSegments.length <= 1) {
     const newline = String.fromCharCode(10);
-    rawSegments = text.split(new RegExp('(?:;|' + newline + '|\band\s+then\b)', 'i'));
+    // Also support splitting by comma or period if multiple names exist
+    rawSegments = text.split(new RegExp('(?:;|' + newline + '|\band\s+then\b|,)', 'i'));
   }
 
   const validSegments = rawSegments
     .map((s) => s.trim())
-    .filter((s) => s.length > 4);
+    .filter((s) => s.length > 1);
 
   if (validSegments.length === 0) {
     validSegments.push(text);
@@ -271,7 +271,6 @@ export function parseBulkVoiceToExcelRecords(
     if (!loanAmount) {
       const nums = seg.match(/\b\d{4,7}\b/g);
       if (nums && nums.length > 0) {
-        // Exclude mobile or page number
         const cand = nums.find((n) => (!cust.mobile || !cust.mobile.includes(n)) && n !== cust.pageNumber && !cust.diary.includes(n));
         if (cand) loanAmount = parseInt(cand, 10);
       }
@@ -279,7 +278,7 @@ export function parseBulkVoiceToExcelRecords(
     if (!loanAmount) loanAmount = 50000;
 
     // 3. Ornament & Metal
-    const wtMatch = seg.match(/(\d+(\.\d+)?)\s*(gram|grams|gm|gms|g|tola|tole|ગ્રામ|તોલા|ग्राम|तोला)/i);
+    const wtMatch = seg.match(/(\d+(\.\d+)?)\s*(gram|grams|gm|gms|g|tola|tole|ગ્રામ|તોલા|gram|tola)/i);
     let weight = 0;
     if (wtMatch) {
       weight = parseFloat(wtMatch[1]);
@@ -315,16 +314,12 @@ export function parseBulkVoiceToExcelRecords(
       weight = metal === 'Silver' ? (category === 'Kandora' ? 500 : 200) : (category === 'Chain' ? 20 : 10);
     }
 
-    // Status Validation
     let status: 'VALID' | 'WARNING' = 'VALID';
     let warningMessage = '';
 
-    if (!cust.name || cust.name === 'Unknown Customer') {
+    if (!cust.name || cust.name === 'Customer') {
       status = 'WARNING';
-      warningMessage = 'Missing name';
-    } else if (!cust.pageNumber) {
-      status = 'WARNING';
-      warningMessage = 'Missing page number';
+      warningMessage = 'Check name';
     }
 
     records.push({
@@ -332,7 +327,7 @@ export function parseBulkVoiceToExcelRecords(
       name: cust.name || `Customer ${index + 1}`,
       village: cust.village || 'Dahod',
       diary: cust.diary || 'Diary 2026',
-      pageNumber: cust.pageNumber || '1',
+      pageNumber: cust.pageNumber || `${index + 1}`,
       mobile: cust.mobile,
       loanAmount,
       metal,
@@ -355,9 +350,9 @@ export function parseLoanVoice(rawText: string, knownCategories: string[] = []):
 
   let loanAmount = 0;
   const amountMatches = [
-    /(?:loan amount|total loan|loan of|amount of|total|રૂપિયા|रुपये|loan)\s*(?:is|of|for)?\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:lakh|thousand|k|lac|rupees|rs|રૂપિયા|रुपये)?/i,
-    /(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:lakh|lac|thousand|k|rupees|rs|રૂપિયા|रुपये)\s*(?:loan|total|amount)/i,
-    /(?:fifty|forty|thirty|twenty|ten|sixty|seventy|eighty|ninety|hundred|thousand|lakh|पचास|साठ|લાખ|હજાર)\s*(?:thousand|lakh|rupees|rs|રૂપિયા|रुपये)?/i,
+    /(?:loan amount|total loan|loan of|amount of|total|રૂપિયા|રકમ|loan)\s*(?:is|of|for)?\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:lakh|thousand|k|lac|rupees|rs|રૂપિયા)?/i,
+    /(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:lakh|lac|thousand|k|rupees|rs|રૂપિયા)\s*(?:loan|total|amount)/i,
+    /(?:fifty|forty|thirty|twenty|ten|sixty|seventy|eighty|ninety|hundred|thousand|lakh|પચાસ|સાઠ|લાખ|હજાર)\s*(?:thousand|lakh|rupees|rs|રૂપિયા)?/i,
   ];
 
   for (const pat of amountMatches) {
@@ -434,7 +429,7 @@ export function parseLoanVoice(rawText: string, knownCategories: string[] = []):
   for (const seg of ornamentSegments) {
     const sLower = seg.toLowerCase();
 
-    const wtMatch = seg.match(/(\d+(\.\d+)?)\s*(gram|grams|gm|gms|g|tola|tole|ગ્રામ|તોલા|ग्राम|तोला)/i);
+    const wtMatch = seg.match(/(\d+(\.\d+)?)\s*(gram|grams|gm|gms|g|tola|tole|ગ્રામ|તોલા)/i);
     let weight = 0;
     if (wtMatch) {
       weight = parseFloat(wtMatch[1]);

@@ -1,5 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Filter out known Whisper hallucination strings (YouTube subtitle artifacts on silence)
+function cleanWhisperTranscript(text: string): string {
+  if (!text) return '';
+  const hallucinations = [
+    /thank you for watching\.?/gi,
+    /thanks for watching\.?/gi,
+    /please subscribe\.?/gi,
+    /subtitles by.*$/gi,
+    /translated by.*$/gi,
+    /amara\.org/gi,
+    /watching!/gi,
+    /\[music\]/gi,
+    /\(music\)/gi,
+    /\[silence\]/gi,
+    /\[applause\]/gi,
+    /\(silence\)/gi,
+  ];
+
+  let cleaned = text;
+  hallucinations.forEach((h) => {
+    cleaned = cleaned.replace(h, '');
+  });
+  return cleaned.trim();
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -12,7 +37,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No audio file provided' }, { status: 400 });
     }
 
-    // If an API key is provided (Groq or OpenAI), call Whisper AI
+    // Call Groq Whisper or OpenAI Whisper if API key is present
     if (apiKey) {
       const isGroq = service === 'groq' || apiKey.startsWith('gsk_');
       const endpoint = isGroq
@@ -27,7 +52,7 @@ export async function POST(req: NextRequest) {
       }
       whisperFormData.append(
         'prompt',
-        'Dahod jewellery store customer records, gold and silver loans, गिरवी, ગિરવે, Ramesh Patel, Suresh Damor, Vova village, Garbada, Limkheda, Kandora, Kada, grams, tola, diary page'
+        'Dahod jewellery store customer records, Nirvan, Ramesh Patel, Suresh Damor, Vova village, Garbada, Limkheda, Kandora, Kada, Chain, Ring, grams, tola, diary page'
       );
 
       const response = await fetch(endpoint, {
@@ -48,40 +73,19 @@ export async function POST(req: NextRequest) {
       }
 
       const data = await response.json();
+      const rawText = data.text || '';
+      const cleaned = cleanWhisperTranscript(rawText);
+
       return NextResponse.json({
-        transcript: data.text || '',
+        transcript: cleaned,
         source: isGroq ? 'groq_whisper' : 'openai_whisper',
       });
     }
 
-    // Try free public HuggingFace Whisper endpoint if no key is configured
-    try {
-      const hfResponse = await fetch('https://api-inference.huggingface.co/models/openai/whisper-large-v3', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'audio/webm',
-        },
-        body: audioFile,
-      });
-
-      if (hfResponse.ok) {
-        const hfData = await hfResponse.json();
-        if (hfData && hfData.text) {
-          return NextResponse.json({
-            transcript: hfData.text,
-            source: 'huggingface_whisper',
-          });
-        }
-      }
-    } catch (hfErr) {
-      console.warn('Huggingface Whisper fallback attempt:', hfErr);
-    }
-
-    // If no cloud API key is configured yet, return clear prompt with setup guide
     return NextResponse.json({
       transcript: '',
       requiresKey: true,
-      message: 'To use our custom Whisper Speech Engine, please provide a Groq or OpenAI API key in Settings or enter it when prompted.',
+      message: 'No Whisper API key configured.',
     });
   } catch (error: any) {
     console.error('Transcribe error:', error);
