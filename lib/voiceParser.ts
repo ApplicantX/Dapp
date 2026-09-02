@@ -187,9 +187,13 @@ export function parseSingleCustomerVoice(rawText: string, knownVillages: string[
 
   cleanForName = cleanForName
     .replace(/\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:lakh|thousand|hazar|k|lac|rupees|rs|રૂપિયા|रुपये|रुपए|loan|amount)\b/gi, '')
-    .replace(/\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:gram|grams|gm|gms|g|tola|tole|ગ્રામ|તોલા|ग्राम|तोला)\b/gi, '')
+    .replace(/(?:(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|ek|do|teen|chaar|char|paanch|panch|che|chhah|saat|aath|nau|das|એક|બે|ત્રણ|ચાર|પાંચ|एक|दो|तीन|चार|पांच)\s*)?(?:quantities|quantity|qty|pieces|piece|pcs|items|item|નંગ|પીસ|पीस|नग)\b/gi, '')
+    .replace(/\b(?:entry|entries|next entry|next|record|account|customer|new customer|add customer|name is|શ્રી|નામ|नाम|श्री|श्रीमती|अगला|अगली|एंट्री|બીજી|બીજો|એન્ટ્રી)\b/gi, '')
+    .replace(/\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:lakh|thousand|hazar|k|lac|rupees|rs|રૂપિયા|રકમ|रुपये|रुपए|loan|amount)\b/gi, '')
+    .replace(/\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:gram|grams|gm|gms|g|tola|tole|કિલો|kg|kilo|ગ્રામ|તોલા|ग्राम|तोला|किलो)\b/gi, '')
     .replace(/\b\d+\b/g, '')
-    .replace(/\b(?:gold|silver|sona|chandi|kandora|kada|chain|ring|necklace|mangalsutra|earrings|bangle|anklet|payal|utensils|coin|સોનું|ચાંદી|કંદોરો|કડા|ચેઇન|વીંટી|હાર|मંગળસૂત્ર|सोना|चांदी|कंदोरा|कड़ा|चेन|अंगूठी|पायल|हार|झुमका)\b/gi, '')
+    .replace(/\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|hundred|thousand|lakh|lac|ek|do|teen|char|chaar|paanch|panch|che|chhah|saat|aath|nau|das|gyarah|barah|terah|unnees|bees|pachees|tees|chalees|pachas|sath|sattar|assi|nabbe|sau|hazar|lakh|એક|બે|ત્રણ|ચાર|પાંચ|છ|સાત|આઠ|નવ|દસ|પચીસ|ત્રીસ|ચાલીસ|પચાસ|સાઠ|સો|હજાર|લાખ|एक|दो|तीन|चार|पांच|छह|सात|आठ|नौ|दस|ग्यारह|बारह|तेरह|बीस|पच्चीस|तीस|चालीस|पचास|साठ|सौ|हजार|हज़ार|लाख)\b/gi, '')
+    .replace(/\b(?:gold|silver|sona|chandi|kandora|kandoro|canedor|canedora|can draw|can dora|can do ra|kandoora|kada|chain|ring|necklace|mangalsutra|earrings|bangle|anklet|payal|utensils|coin|સોનું|ચાંદી|કંદોરો|કડા|ચેઇન|વીંટી|હાર|મંગળસૂત્ર|सोना|चांदी|कंदोरा|कड़ा|चेन|अंगूठी|पायल|हार|झुमका)\b/gi, '')
     .replace(/(?:customer|new customer|add customer|name is|શ્રી|નામ|नाम|श्री|श्रीमती|\bno\.?\s*\d+|thank you|thanks|from|village|diary|page|loan|rupees|રૂપિયા|रुपये)/gi, '')
     .replace(/[^A-Za-z\u0A80-\u0AFF\u0900-\u097F\s]/g, '')
     .trim();
@@ -220,7 +224,7 @@ export function parseBulkCustomersVoice(rawText: string, knownVillages: string[]
 
   if (!text) return [];
 
-  let segments = text.split(/(?:\b\d+[\.\)]|\bCustomer\s*\d+:?|\bનંબર\s*\d+:?|\bनंबर\s*\d+:?|\bnumber\s*\d+:?|\bnext\s*customer:?|\bagla\s*customer:?|\band\s+next:?)/i);
+  let segments = text.split(/(?:(?:^|\s)\d+[\.\)]|\b(?:next|अगला|अगली|બીજી|બીજો|પછીની)\s*(?:entry|customer|account|record|loan|ग्राहक|एंट्री|એન્ટ્રી)?\b|\b(?:entry|account|customer|record)\s*\d+:?|\bCustomer\s*\d+:?|\bનંબર\s*\d+:?|\bनंबर\s*\d+:?|\bnumber\s*\d+:?|\band\s+next:?|\bપછી:?)/i);
 
   if (segments.length <= 1) {
     const newline = String.fromCharCode(10);
@@ -540,6 +544,23 @@ export function parseBulkVoiceToExcelRecords(
       }
     }
 
+    // 8.5 Quantity extraction
+    let quantity = 1;
+    const qtyMatches = [
+      /(\d+|one|two|three|four|five|six|seven|eight|nine|ten|ek|do|teen|chaar|char|paanch|panch|che|chhah|saat|aath|nau|das|એક|બે|ત્રણ|ચાર|પાંચ|एक|दो|तीन|चार|पांच|छह|सात|आठ|नौ|दस)\s*(?:quantities|quantity|qty|pieces|piece|pcs|items|item|નંગ|પીસ|पीस|नग)\b/i,
+      /(?:quantities|quantity|qty|pieces|pcs|નંગ|પીસ|पीस|नग)\s*(?:is|of|hai|che|હે)?\s*(\d+|one|two|three|four|five|six|seven|eight|nine|ten|ek|do|teen|chaar|char|paanch|panch|che|એક|બે|ત્રણ|ચાર|પાંચ|एक|दो|तीन|चार|पांच)\b/i,
+    ];
+    for (const pat of qtyMatches) {
+      const qm = seg.match(pat);
+      if (qm) {
+        const qVal = parseSpokenNumber(qm[1]);
+        if (qVal && qVal >= 1 && qVal <= 100) {
+          quantity = Math.round(qVal);
+          break;
+        }
+      }
+    }
+
     // 9. Customer Name extraction
     let cleanForName = seg;
     if (village) {
@@ -556,9 +577,12 @@ export function parseBulkVoiceToExcelRecords(
     }
 
     cleanForName = cleanForName
+      .replace(/(?:(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|ek|do|teen|chaar|char|paanch|panch|che|chhah|saat|aath|nau|das|એક|બે|ત્રણ|ચાર|પાંચ|एक|दो|तीन|चार|पांच)\s*)?(?:quantities|quantity|qty|pieces|piece|pcs|items|item|નંગ|પીસ|पीस|नग)\b/gi, '')
+      .replace(/\b(?:entry|entries|next entry|next|record|account|customer|new customer|add customer|name is|શ્રી|નામ|नाम|श्री|श्रीमती|अगला|अगली|एंट्री|બીજી|બીજો|એન્ટ્રી)\b/gi, '')
       .replace(/\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:lakh|thousand|hazar|k|lac|rupees|rs|રૂપિયા|રકમ|रुपये|रुपए|loan|amount|लोन)\b/gi, '')
-      .replace(/(?:(?:one|two|three|four|five|six|seven|eight|nine|ten|twenty|fifty|hundred|two hundred|three hundred|four hundred|five hundred|pachas|sau|be sau|tran sau|char sau|panch sau|dosau|teensau|\d+)\s*)+(?:gram|grams|gm|gms|g|grand|tola|tole|ગ્રામ|તોલા|ग्राम|तोला)/gi, '')
+      .replace(/(?:(?:one|two|three|four|five|six|seven|eight|nine|ten|twenty|fifty|hundred|two hundred|three hundred|four hundred|five hundred|pachas|sau|be sau|tran sau|char sau|panch sau|dosau|teensau|\d+)\s*)+(?:gram|grams|gm|gms|g|grand|tola|tole|ગ્રામ|તોલા|કિલો|kg|kilo|ग्राम|तोला|किलो)/gi, '')
       .replace(/\b\d+\b/g, '')
+      .replace(/\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|hundred|thousand|lakh|lac|ek|do|teen|char|chaar|paanch|panch|che|chhah|saat|aath|nau|das|gyarah|barah|terah|unnees|bees|pachees|tees|chalees|pachas|sath|sattar|assi|nabbe|sau|hazar|lakh|એક|બે|ત્રણ|ચાર|પાંચ|છ|સાત|આઠ|નવ|દસ|પચીસ|ત્રીસ|ચાલીસ|પચાસ|સાઠ|સો|હજાર|લાખ|एक|दो|तीन|चार|पांच|छह|सात|आठ|नौ|दस|ग्यारह|बारह|तेरह|बीस|पच्चीस|तीस|चालीस|पचास|साठ|सौ|हजार|हज़ार|लाख)\b/gi, '')
       .replace(/\b(?:gold|silver|sona|chandi|kandora|kandoro|controller|control|kontroller|canedor|canedora|can draw|can dora|can do ra|kandoora|kada|chain|ring|necklace|mangalsutra|earrings|bangle|anklet|payal|utensils|coin|સોનું|ચાંદી|કંદોરો|કડા|ચેઇન|વીંટી|હાર|મંગળસૂત્ર|सोना|चांदी|कंदोरा|कड़ा|चेन|अंगूठी|पायल|हार|झुमका)\b/gi, '')
       .replace(/(?:customer|new customer|add customer|name is|શ્રી|નામ|नाम|श्री|श्रीमती|\bno\.?\s*\d+|thank you|thanks|from|village|diary|page|loan|rupees|રૂપિયા|રકમ|रुपये)/gi, '')
       .replace(/[^A-Za-z\u0A80-\u0AFF\u0900-\u097F\s]/g, '')
@@ -586,7 +610,7 @@ export function parseBulkVoiceToExcelRecords(
       metal,
       category,
       weight,
-      quantity: 1,
+      quantity,
       mobile,
       rawSpeech: seg,
       status: hasWarning ? 'WARNING' : 'VALID',

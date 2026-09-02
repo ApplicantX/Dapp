@@ -535,7 +535,7 @@ export const BulkDataInputTab: React.FC<BulkDataInputTabProps> = ({
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2 text-xs">
                   {/* Name */}
                   <div className="col-span-2 space-y-0.5">
                     <label className="text-[10px] font-medium text-zinc-500">Name</label>
@@ -613,6 +613,31 @@ export const BulkDataInputTab: React.FC<BulkDataInputTabProps> = ({
                       value={item.category}
                       onChange={(e) => handlePendingCellEdit(item.id, 'category', e.target.value)}
                       className="w-full px-2 py-1.5 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-800 text-xs focus:bg-white focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Weight (g) */}
+                  <div className="space-y-0.5">
+                    <label className="text-[10px] font-medium text-zinc-500">Weight (g)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={item.weight}
+                      onChange={(e) => handlePendingCellEdit(item.id, 'weight', parseFloat(e.target.value) || 0)}
+                      className="w-full px-2 py-1.5 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-900 font-semibold text-xs text-center focus:bg-white focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Qty */}
+                  <div className="space-y-0.5">
+                    <label className="text-[10px] font-medium text-zinc-500">Qty</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="50"
+                      value={item.quantity}
+                      onChange={(e) => handlePendingCellEdit(item.id, 'quantity', parseInt(e.target.value, 10) || 1)}
+                      className="w-full px-2 py-1.5 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-900 font-semibold text-xs text-center focus:bg-white focus:outline-none"
                     />
                   </div>
                 </div>
