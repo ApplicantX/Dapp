@@ -102,17 +102,19 @@ export function sanitizeTranscript(text: string): string {
 }
 
 /**
- * High-Reliability Live Speech Engine
+ * High-Reliability Dual-Channel Live Speech Engine
  * - Real-Time Live Streaming Transcription (words appear instantly while speaking)
- * - Auto-restarting continuous SpeechRecognition session
- * - Rolling background ASR fallback for browsers without Web Speech
- * - Native MediaRecorder for final high-accuracy audio submission
+ * - Dual Recording: Generates pristine 16kHz PCM WAV + Native MediaRecorder
+ * - Machine Learning: In-app neural speech recognition via Next.js backend (zero API keys needed)
  */
 export class CustomHybridSpeechEngine {
   private mediaRecorder: MediaRecorder | null = null;
   private recordedBlobs: Blob[] = [];
+  private pcmChunks: Float32Array[] = [];
   private audioContext: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
+  private processor: ScriptProcessorNode | null = null;
+  private silentGain: GainNode | null = null;
   private source: MediaStreamAudioSourceNode | null = null;
   private stream: MediaStream | null = null;
   private animFrameId: number | null = null;
@@ -164,6 +166,7 @@ export class CustomHybridSpeechEngine {
   async start(callbacks: SpeechCallbacks): Promise<void> {
     this.callbacks = callbacks;
     this.recordedBlobs = [];
+    this.pcmChunks = [];
     this.liveRealtimeText = '';
     this.accumulatedFinalText = '';
     this.maxAudioLevelDetected = 0;
@@ -222,7 +225,6 @@ export class CustomHybridSpeechEngine {
               }
             };
 
-            // Auto-restart if browser closes recognition during recording
             this.recognition.onend = () => {
               if (this.isRecording && this.recognition) {
                 try {
@@ -232,15 +234,14 @@ export class CustomHybridSpeechEngine {
             };
 
             this.recognition.onerror = (event: any) => {
-              // Non-fatal, handled by rolling engine
-              console.debug('Live speech stream status:', event.error);
+              console.debug('Live speech stream note:', event.error);
             };
 
             try {
               this.recognition.start();
             } catch (e) {}
           } catch (recErr) {
-            console.warn('SpeechRecognition instance error:', recErr);
+            console.warn('SpeechRecognition init error:', recErr);
           }
         }
       }
@@ -277,7 +278,7 @@ export class CustomHybridSpeechEngine {
         this.mediaRecorder.start(250);
       }
 
-      // 4. Web Audio Context for Real-Time Audio Level & Voice Activity Visualizer
+      // 4. Web Audio Context for Real-Time Level Meter & Direct PCM sample collection
       try {
         const AudioCtx =
           window.AudioContext ||
@@ -293,6 +294,22 @@ export class CustomHybridSpeechEngine {
         this.analyser.fftSize = 256;
         this.analyser.smoothingTimeConstant = 0.3;
         this.source.connect(this.analyser);
+
+        // Record raw PCM samples directly in script processor as primary uncompressed audio
+        this.processor = this.audioContext.createScriptProcessor(4096, 1, 1);
+        this.processor.onaudioprocess = (e) => {
+          if (!this.isRecording) return;
+          const input = e.inputBuffer.getChannelData(0);
+          const copy = new Float32Array(input.length);
+          copy.set(input);
+          this.pcmChunks.push(copy);
+        };
+
+        this.silentGain = this.audioContext.createGain();
+        this.silentGain.gain.value = 0;
+        this.source.connect(this.processor);
+        this.processor.connect(this.silentGain);
+        this.silentGain.connect(this.audioContext.destination);
 
         const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
         const checkLevel = () => {
@@ -374,7 +391,30 @@ export class CustomHybridSpeechEngine {
       this.totalRecordedBytes = finalAudioBlob.size;
     }
 
+    // Convert recorded PCM chunks into pristine 16kHz uncompressed Mono WAV
+    let directWavBlob: Blob | null = null;
+    const totalPcmSamples = this.pcmChunks.reduce((sum, c) => sum + c.length, 0);
+    if (totalPcmSamples > 4000) {
+      const mergedSamples = new Float32Array(totalPcmSamples);
+      let offset = 0;
+      for (const chunk of this.pcmChunks) {
+        mergedSamples.set(chunk, offset);
+        offset += chunk.length;
+      }
+      const inputSampleRate = this.audioContext ? this.audioContext.sampleRate : 44100;
+      const resampled16k = resampleTo16k(mergedSamples, inputSampleRate);
+      directWavBlob = encodeWavBlob(resampled16k, 16000);
+    }
+
     // Clean up audio hardware
+    if (this.processor) {
+      this.processor.disconnect();
+      this.processor = null;
+    }
+    if (this.silentGain) {
+      this.silentGain.disconnect();
+      this.silentGain = null;
+    }
     if (this.source) {
       this.source.disconnect();
       this.source = null;
@@ -397,19 +437,23 @@ export class CustomHybridSpeechEngine {
         ? localStorage.getItem('dahod_whisper_api_key') || ''
         : '');
 
-    // Send the complete high-fidelity audio to our in-app neural transcription endpoint
-    if (finalAudioBlob && finalAudioBlob.size > 200) {
+    // Prefer uncompressed PCM WAV for 100% reliable decoding, with MediaRecorder as fallback
+    const audioToSend = directWavBlob || finalAudioBlob;
+
+    if (audioToSend && audioToSend.size > 200) {
       try {
         this.callbacks.onInterimResult?.('Finalizing transcription...');
 
         const formData = new FormData();
-        const extension = finalAudioBlob.type.includes('mp4')
+        const filename = audioToSend === directWavBlob
+          ? 'recording.wav'
+          : audioToSend.type.includes('mp4')
           ? 'recording.mp4'
-          : finalAudioBlob.type.includes('wav')
+          : audioToSend.type.includes('wav')
           ? 'recording.wav'
           : 'recording.webm';
 
-        formData.append('audio', finalAudioBlob, extension);
+        formData.append('audio', audioToSend, filename);
         formData.append('language', this.language);
 
         if (keyToUse) {

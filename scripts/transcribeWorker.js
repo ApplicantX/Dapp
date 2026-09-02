@@ -78,24 +78,33 @@ function decodeWavToFloat32(buffer) {
   return samples;
 }
 
-async function convertAudioTo16kFloat32(audioBuffer) {
+async function convertAudioTo16kFloat32(audioFilePath, audioBuffer) {
   if (!audioBuffer || audioBuffer.length < 100) {
     return new Float32Array(0);
   }
 
+  // 1. Direct WAV decoding if it's already a RIFF PCM WAV (fast, zero external calls)
+  if (audioBuffer.length >= 44 && audioBuffer.toString('ascii', 0, 4) === 'RIFF') {
+    const directWav = decodeWavToFloat32(audioBuffer);
+    if (directWav && directWav.length > 0) {
+      return directWav;
+    }
+  }
+
+  // 2. FFmpeg decoding directly from file path (allows seekable Matroska/WebM/MP4 parsing)
   try {
     const ffmpegPath = getFfmpegPath();
     const pcmFloat32 = await new Promise((resolve) => {
       const proc = spawn(
         ffmpegPath,
         [
-          '-i', 'pipe:0',
-          '-f', 'f32le', // 32-bit float PCM
-          '-ac', '1',    // mono
-          '-ar', '16000',// 16kHz
+          '-i', audioFilePath, // Read directly from file to allow container seeking!
+          '-f', 'f32le',       // 32-bit float PCM
+          '-ac', '1',          // mono
+          '-ar', '16000',      // 16kHz standard
           'pipe:1',
         ],
-        { stdio: ['pipe', 'pipe', 'ignore'] }
+        { stdio: ['ignore', 'pipe', 'ignore'] }
       );
 
       const chunks = [];
@@ -106,29 +115,20 @@ async function convertAudioTo16kFloat32(audioBuffer) {
           const floats = new Float32Array(fullBuf.buffer, fullBuf.byteOffset, Math.floor(fullBuf.byteLength / 4));
           resolve(floats);
         } else {
-          resolve(decodeWavToFloat32(audioBuffer));
+          resolve(new Float32Array(0));
         }
       });
       proc.on('error', () => {
-        resolve(decodeWavToFloat32(audioBuffer));
+        resolve(new Float32Array(0));
       });
-
-      try {
-        proc.stdin.write(audioBuffer);
-        proc.stdin.end();
-      } catch (writeErr) {
-        resolve(decodeWavToFloat32(audioBuffer));
-      }
     });
 
     if (pcmFloat32 && pcmFloat32.length > 0) {
       return pcmFloat32;
     }
-  } catch (e) {
-    // fallback
-  }
+  } catch (e) {}
 
-  return decodeWavToFloat32(audioBuffer);
+  return new Float32Array(0);
 }
 
 function cleanWhisperTranscript(text) {
@@ -160,20 +160,20 @@ async function main() {
   const language = process.argv[3] || 'auto';
 
   if (!audioFilePath || !fs.existsSync(audioFilePath)) {
-    console.log(JSON.stringify({ transcript: '', message: 'Audio file not found' }));
+    console.log('__JSON_START__' + JSON.stringify({ transcript: '', message: 'Audio file not found' }) + '__JSON_END__');
     process.exit(0);
   }
 
   const audioBuffer = fs.readFileSync(audioFilePath);
   if (!audioBuffer || audioBuffer.length < 100) {
-    console.log(JSON.stringify({ transcript: '', message: 'Audio buffer empty' }));
+    console.log('__JSON_START__' + JSON.stringify({ transcript: '', message: 'Audio buffer empty' }) + '__JSON_END__');
     process.exit(0);
   }
 
-  const pcmSamples = await convertAudioTo16kFloat32(audioBuffer);
+  const pcmSamples = await convertAudioTo16kFloat32(audioFilePath, audioBuffer);
 
   if (!pcmSamples || pcmSamples.length === 0) {
-    console.log(JSON.stringify({ transcript: '', message: 'Audio was silent' }));
+    console.log('__JSON_START__' + JSON.stringify({ transcript: '', message: 'Audio was silent or not decodable' }) + '__JSON_END__');
     process.exit(0);
   }
 
@@ -195,12 +195,14 @@ async function main() {
   const rawText = (output && output.text) ? output.text : '';
   const cleaned = cleanWhisperTranscript(rawText);
 
-  console.log(JSON.stringify({ transcript: cleaned, rawText }));
+  // If cleaning stripped everything but rawText had actual content, preserve rawText
+  const finalTranscript = cleaned || (rawText && !/^\s*\[.*\]\s*$/.test(rawText) ? rawText.trim() : '');
+
+  console.log('__JSON_START__' + JSON.stringify({ transcript: finalTranscript, rawText }) + '__JSON_END__');
   process.exit(0);
 }
 
 main().catch((err) => {
-  // Always exit with 0 and print clean JSON so parent process never throws 500
-  console.log(JSON.stringify({ transcript: '', error: err.message || String(err) }));
+  console.log('__JSON_START__' + JSON.stringify({ transcript: '', error: err.message || String(err) }) + '__JSON_END__');
   process.exit(0);
 });

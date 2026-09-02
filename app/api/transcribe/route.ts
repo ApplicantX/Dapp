@@ -110,7 +110,6 @@ export async function POST(req: NextRequest) {
     const workerScript = path.join(process.cwd(), 'scripts', 'transcribeWorker.js');
 
     const result = await new Promise<{ transcript: string; rawText?: string }>((resolve) => {
-      // Find node executable in PATH or fall back to /usr/local/bin/node
       const nodePath = process.execPath || '/usr/local/bin/node';
       const env = { ...process.env, PATH: `${process.env.PATH || ''}:/usr/local/bin:/opt/homebrew/bin` };
 
@@ -124,10 +123,16 @@ export async function POST(req: NextRequest) {
             return resolve({ transcript: '' });
           }
           try {
-            const lines = stdout.trim().split(/\r?\n/);
-            const lastLine = lines[lines.length - 1];
-            const data = JSON.parse(lastLine);
-            resolve(data);
+            const startTag = '__JSON_START__';
+            const endTag = '__JSON_END__';
+            const startIdx = stdout.indexOf(startTag);
+            const endIdx = stdout.indexOf(endTag);
+            if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+              const jsonStr = stdout.substring(startIdx + startTag.length, endIdx);
+              const data = JSON.parse(jsonStr);
+              return resolve(data);
+            }
+            resolve({ transcript: '' });
           } catch (jsonErr) {
             console.warn('Worker output parsing note:', stdout);
             resolve({ transcript: '' });
@@ -137,15 +142,15 @@ export async function POST(req: NextRequest) {
     });
 
     const cleaned = cleanWhisperTranscript(result.transcript || result.rawText || '');
+    const finalResult = cleaned || (result.rawText && !/^\s*\[.*\]\s*$/.test(result.rawText) ? result.rawText.trim() : '');
 
     return NextResponse.json({
-      transcript: cleaned,
+      transcript: finalResult,
       rawText: result.rawText,
       source: 'local_neural_engine',
     });
   } catch (error: any) {
     console.error('Transcribe route handler note:', error);
-    // Return 200 with empty transcript instead of 500 to prevent client crash
     return NextResponse.json({
       transcript: '',
       error: error.message || 'Processing error',
