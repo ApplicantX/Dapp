@@ -120,7 +120,7 @@ export class CustomHybridSpeechEngine {
   private animFrameId: number | null = null;
   private isRecording: boolean = false;
   private callbacks: SpeechCallbacks = {};
-  private language: string = 'auto'; // 'en', 'hi', or 'auto'
+  private language: string = 'en'; // 'en', 'hi', or 'auto'
 
   // Recording diagnostics
   private startTime: number = 0;
@@ -133,7 +133,7 @@ export class CustomHybridSpeechEngine {
   private accumulatedFinalText: string = '';
   private liveRealtimeText: string = '';
 
-  constructor(language: string = 'auto') {
+  constructor(language: string = 'en') {
     this.language = language;
   }
 

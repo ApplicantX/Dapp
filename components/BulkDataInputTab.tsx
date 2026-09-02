@@ -44,7 +44,7 @@ export const BulkDataInputTab: React.FC<BulkDataInputTabProps> = ({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState('');
   const [audioLevel, setAudioLevel] = useState(0);
-  const [speechLanguage, setSpeechLanguage] = useState<'auto' | 'en' | 'hi'>('auto');
+  const [speechLanguage, setSpeechLanguage] = useState<'auto' | 'en' | 'hi'>('en');
 
   // Modals & UI Controls
   const [searchFilter, setSearchFilter] = useState('');
