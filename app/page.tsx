@@ -33,7 +33,6 @@ import {
 
 export default function HomePage() {
   const [data, setData] = useState<AppData>(initialAppData);
-  const [isLoaded, setIsLoaded] = useState(false);
 
   // Navigation State
   const [currentView, setCurrentView] = useState<'HOME' | 'CUSTOMERS' | 'CALCULATOR' | 'BULK_INPUT'>('HOME');
@@ -49,12 +48,11 @@ export default function HomePage() {
   useEffect(() => {
     try {
       const stored = getStoredData();
-      setData(stored);
+      if (stored) {
+        setData(stored);
+      }
     } catch (err) {
-      console.error('Failed to load stored data:', err);
-      setData(initialAppData);
-    } finally {
-      setIsLoaded(true);
+      console.warn('Failed to load stored data:', err);
     }
   }, []);
 
@@ -104,29 +102,6 @@ export default function HomePage() {
     const updated = closeLoan(data, loanId);
     setData(updated);
   };
-
-  if (!isLoaded) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#fafafa] text-purple-600 p-4">
-        <div className="flex flex-col items-center gap-3 text-center">
-          <Gem className="w-10 h-10 animate-pulse text-purple-600" />
-          <span className="text-sm font-semibold tracking-wider text-zinc-700">
-            Dahod Jewellery Lending
-          </span>
-          <p className="text-xs text-zinc-400">Loading ledger data...</p>
-          <button
-            onClick={() => {
-              resetToSampleData();
-              window.location.reload();
-            }}
-            className="mt-2 text-[11px] text-purple-600 hover:text-purple-800 underline font-medium"
-          >
-            Reset data to defaults & reload
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   // Active Loan & Vault Calculations
   const activeLoans = (data?.loans || []).filter((l) => l && l.status === 'ACTIVE');
