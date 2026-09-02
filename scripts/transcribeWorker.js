@@ -1,8 +1,27 @@
 #!/usr/bin/env node
 const fs = require('fs');
+const path = require('path');
 const { spawn } = require('child_process');
 
+function getFfmpegPath() {
+  const candidates = ['/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', 'ffmpeg'];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return 'ffmpeg';
+}
+
 function decodeWavToFloat32(buffer) {
+  if (!buffer || buffer.length < 44) {
+    return new Float32Array(0);
+  }
+
+  // Ensure it's a RIFF WAVE
+  const riff = buffer.toString('ascii', 0, 4);
+  if (riff !== 'RIFF') {
+    return new Float32Array(0);
+  }
+
   let pos = 12;
   let channels = 1;
   let sampleRate = 16000;
@@ -13,8 +32,8 @@ function decodeWavToFloat32(buffer) {
     const chunkId = buffer.toString('ascii', pos, pos + 4);
     const chunkSize = buffer.readUInt32LE(pos + 4);
     if (chunkId === 'fmt ') {
-      channels = buffer.readUInt16LE(pos + 10);
-      sampleRate = buffer.readUInt32LE(pos + 12);
+      channels = buffer.readUInt16LE(pos + 10) || 1;
+      sampleRate = buffer.readUInt32LE(pos + 12) || 16000;
     } else if (chunkId === 'data') {
       dataOffset = pos + 8;
       dataLength = chunkSize;
@@ -23,7 +42,15 @@ function decodeWavToFloat32(buffer) {
     pos += 8 + chunkSize;
   }
 
-  const numSamples = Math.floor(dataLength / (2 * channels));
+  if (dataLength <= 0 || dataOffset + dataLength > buffer.length) {
+    dataLength = Math.max(0, buffer.length - dataOffset);
+  }
+
+  const numSamples = Math.max(0, Math.floor(dataLength / (2 * channels)));
+  if (numSamples === 0) {
+    return new Float32Array(0);
+  }
+
   const samples = new Float32Array(numSamples);
 
   for (let i = 0; i < numSamples; i++) {
@@ -32,13 +59,33 @@ function decodeWavToFloat32(buffer) {
       samples[i] = buffer.readInt16LE(byteOffset) / 32768.0;
     }
   }
+
+  // Resample linearly if needed
+  if (sampleRate !== 16000 && sampleRate > 0 && samples.length > 0) {
+    const ratio = sampleRate / 16000;
+    const outputLength = Math.max(1, Math.round(samples.length / ratio));
+    const resampled = new Float32Array(outputLength);
+    for (let i = 0; i < outputLength; i++) {
+      const targetIdx = i * ratio;
+      const leftIdx = Math.floor(targetIdx);
+      const rightIdx = Math.min(leftIdx + 1, samples.length - 1);
+      const weight = targetIdx - leftIdx;
+      resampled[i] = samples[leftIdx] * (1 - weight) + samples[rightIdx] * weight;
+    }
+    return resampled;
+  }
+
   return samples;
 }
 
 async function convertAudioTo16kFloat32(audioBuffer) {
+  if (!audioBuffer || audioBuffer.length < 100) {
+    return new Float32Array(0);
+  }
+
   try {
-    const ffmpegPath = '/opt/homebrew/bin/ffmpeg';
-    const pcmFloat32 = await new Promise((resolve, reject) => {
+    const ffmpegPath = getFfmpegPath();
+    const pcmFloat32 = await new Promise((resolve) => {
       const proc = spawn(
         ffmpegPath,
         [
@@ -54,9 +101,9 @@ async function convertAudioTo16kFloat32(audioBuffer) {
       const chunks = [];
       proc.stdout.on('data', (d) => chunks.push(d));
       proc.on('close', (code) => {
-        if (code === 0) {
+        if (code === 0 && chunks.length > 0) {
           const fullBuf = Buffer.concat(chunks);
-          const floats = new Float32Array(fullBuf.buffer, fullBuf.byteOffset, fullBuf.byteLength / 4);
+          const floats = new Float32Array(fullBuf.buffer, fullBuf.byteOffset, Math.floor(fullBuf.byteLength / 4));
           resolve(floats);
         } else {
           resolve(decodeWavToFloat32(audioBuffer));
@@ -65,16 +112,22 @@ async function convertAudioTo16kFloat32(audioBuffer) {
       proc.on('error', () => {
         resolve(decodeWavToFloat32(audioBuffer));
       });
-      proc.stdin.write(audioBuffer);
-      proc.stdin.end();
+
+      try {
+        proc.stdin.write(audioBuffer);
+        proc.stdin.end();
+      } catch (writeErr) {
+        resolve(decodeWavToFloat32(audioBuffer));
+      }
     });
 
     if (pcmFloat32 && pcmFloat32.length > 0) {
       return pcmFloat32;
     }
   } catch (e) {
-    // fallback to manual WAV decoder
+    // fallback
   }
+
   return decodeWavToFloat32(audioBuffer);
 }
 
@@ -107,11 +160,16 @@ async function main() {
   const language = process.argv[3] || 'auto';
 
   if (!audioFilePath || !fs.existsSync(audioFilePath)) {
-    console.log(JSON.stringify({ error: 'Audio file not found' }));
-    process.exit(1);
+    console.log(JSON.stringify({ transcript: '', message: 'Audio file not found' }));
+    process.exit(0);
   }
 
   const audioBuffer = fs.readFileSync(audioFilePath);
+  if (!audioBuffer || audioBuffer.length < 100) {
+    console.log(JSON.stringify({ transcript: '', message: 'Audio buffer empty' }));
+    process.exit(0);
+  }
+
   const pcmSamples = await convertAudioTo16kFloat32(audioBuffer);
 
   if (!pcmSamples || pcmSamples.length === 0) {
@@ -138,9 +196,11 @@ async function main() {
   const cleaned = cleanWhisperTranscript(rawText);
 
   console.log(JSON.stringify({ transcript: cleaned, rawText }));
+  process.exit(0);
 }
 
 main().catch((err) => {
-  console.error(JSON.stringify({ error: err.message || String(err) }));
-  process.exit(1);
+  // Always exit with 0 and print clean JSON so parent process never throws 500
+  console.log(JSON.stringify({ transcript: '', error: err.message || String(err) }));
+  process.exit(0);
 });

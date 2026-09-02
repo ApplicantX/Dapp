@@ -120,10 +120,6 @@ export class CustomHybridSpeechEngine {
   private callbacks: SpeechCallbacks = {};
   private language: string = 'auto'; // 'en', 'hi', or 'auto'
 
-  // Rolling background transcription timer
-  private rollingTimer: any = null;
-  private isRollingProcessing: boolean = false;
-
   // Recording diagnostics
   private startTime: number = 0;
   private maxAudioLevelDetected: number = 0;
@@ -329,43 +325,6 @@ export class CustomHybridSpeechEngine {
         console.warn('Audio visualizer error:', audioCtxErr);
       }
 
-      // 5. Rolling Neural Transcription Loop (updates live transcript even in Brave/Firefox without Web Speech)
-      this.rollingTimer = setInterval(async () => {
-        if (!this.isRecording || this.isRollingProcessing) return;
-        // If live browser stream is already producing text, let it handle fast live streaming
-        if (this.liveRealtimeText.length > 5) return;
-
-        if (this.recordedBlobs.length > 0 && this.totalRecordedBytes > 3000) {
-          try {
-            this.isRollingProcessing = true;
-            const mime = this.recordedBlobs[0].type || 'audio/webm';
-            const sliceBlob = new Blob(this.recordedBlobs, { type: mime });
-            const formData = new FormData();
-            formData.append('audio', sliceBlob, 'slice.webm');
-            formData.append('language', this.language);
-            formData.append('service', 'local');
-
-            const res = await fetch('/api/transcribe', {
-              method: 'POST',
-              body: formData,
-            });
-
-            if (res.ok) {
-              const data = await res.json();
-              const transcript = sanitizeTranscript(data.transcript || data.rawText || '');
-              if (transcript && this.isRecording) {
-                this.liveRealtimeText = transcript;
-                callbacks.onInterimResult?.(transcript);
-              }
-            }
-          } catch (e) {
-            // Non-fatal rolling slice error
-          } finally {
-            this.isRollingProcessing = false;
-          }
-        }
-      }, 2200);
-
       callbacks.onStart?.();
     } catch (err: any) {
       this.isRecording = false;
@@ -382,11 +341,6 @@ export class CustomHybridSpeechEngine {
 
   async stop(apiKey?: string): Promise<string> {
     this.isRecording = false;
-
-    if (this.rollingTimer) {
-      clearInterval(this.rollingTimer);
-      this.rollingTimer = null;
-    }
 
     if (this.animFrameId) {
       cancelAnimationFrame(this.animFrameId);
