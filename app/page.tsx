@@ -4,12 +4,14 @@ import React, { useState, useEffect } from 'react';
 import { AppData, Customer, Loan, Ornament } from '@/lib/types';
 import {
   getStoredData,
+  resetToSampleData,
   addCustomer,
   addBatchCustomers,
   updateCustomer,
   addLoan,
   closeLoan,
 } from '@/lib/storage';
+import { initialAppData } from '@/lib/sampleData';
 import { Navbar } from '@/components/Navbar';
 import { CustomerList } from '@/components/CustomerList';
 import { CustomerDetailView } from '@/components/CustomerDetailView';
@@ -24,15 +26,13 @@ import {
   Calculator,
   Users,
   Gem,
-  Coins,
   ArrowRight,
   Sparkles,
   Mic,
-  FileSpreadsheet,
 } from 'lucide-react';
 
 export default function HomePage() {
-  const [data, setData] = useState<AppData>(getStoredData());
+  const [data, setData] = useState<AppData>(initialAppData);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Navigation State
@@ -47,8 +47,15 @@ export default function HomePage() {
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
   useEffect(() => {
-    setData(getStoredData());
-    setIsLoaded(true);
+    try {
+      const stored = getStoredData();
+      setData(stored);
+    } catch (err) {
+      console.error('Failed to load stored data:', err);
+      setData(initialAppData);
+    } finally {
+      setIsLoaded(true);
+    }
   }, []);
 
   const refreshData = () => {
@@ -100,33 +107,44 @@ export default function HomePage() {
 
   if (!isLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0114] text-gold-400">
-        <div className="flex flex-col items-center gap-3">
-          <Gem className="w-10 h-10 animate-pulse text-gold-400" />
-          <span className="text-sm font-semibold tracking-wider text-purple-200/80">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#fafafa] text-purple-600 p-4">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <Gem className="w-10 h-10 animate-pulse text-purple-600" />
+          <span className="text-sm font-semibold tracking-wider text-zinc-700">
             Dahod Jewellery Lending
           </span>
+          <p className="text-xs text-zinc-400">Loading ledger data...</p>
+          <button
+            onClick={() => {
+              resetToSampleData();
+              window.location.reload();
+            }}
+            className="mt-2 text-[11px] text-purple-600 hover:text-purple-800 underline font-medium"
+          >
+            Reset data to defaults & reload
+          </button>
         </div>
       </div>
     );
   }
 
   // Active Loan & Vault Calculations
-  const activeLoans = data.loans.filter((l) => l.status === 'ACTIVE');
+  const activeLoans = (data?.loans || []).filter((l) => l && l.status === 'ACTIVE');
   let totalActivePrincipal = 0;
   let totalActiveGoldGrams = 0;
   let totalActiveSilverGrams = 0;
 
   activeLoans.forEach((l) => {
-    totalActivePrincipal += l.loanAmount;
-    l.ornaments.forEach((o) => {
-      if (o.metal === 'Gold') totalActiveGoldGrams += o.weight;
-      else totalActiveSilverGrams += o.weight;
+    totalActivePrincipal += Number(l.loanAmount) || 0;
+    (l.ornaments || []).forEach((o) => {
+      if (!o) return;
+      if (o.metal === 'Gold') totalActiveGoldGrams += Number(o.weight) || 0;
+      else totalActiveSilverGrams += Number(o.weight) || 0;
     });
   });
 
   return (
-    <div className="min-h-screen flex flex-col bg-transparent text-slate-100">
+    <div className="min-h-screen flex flex-col bg-[#fafafa] text-zinc-900">
       {/* Minimal Navbar */}
       <Navbar
         currentView={currentView}
@@ -143,46 +161,46 @@ export default function HomePage() {
         {/* VIEW 1: HOME STARTING SCREEN */}
         {currentView === 'HOME' && (
           <div className="space-y-10 sm:space-y-12">
-            {/* Minimalist Luxury Hero */}
-            <div className="text-center max-w-3xl mx-auto space-y-4">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-gold-500/10 border border-gold-500/25 text-gold-300 text-xs font-semibold tracking-wide">
-                <Sparkles className="w-3.5 h-3.5 text-gold-400" />
-                <span>Continuous Voice to Excel & Diary Ledger</span>
+            {/* Minimalist Hero */}
+            <div className="text-center max-w-3xl mx-auto space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-50 border border-purple-200/80 text-purple-700 text-xs font-semibold tracking-wide">
+                <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                <span>Voice-First Lending Ledger & Diary Record</span>
               </div>
-              <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight font-serif">
+              <h1 className="text-3xl sm:text-5xl font-bold text-zinc-900 tracking-tight">
                 Dahod Jewellery & Lending
               </h1>
-              <p className="text-sm sm:text-base text-purple-200/70 leading-relaxed">
-                Speak details for 500+ customer loans at once with auto-capture to Excel, or lookup physical diary pages and calculate compound interest.
+              <p className="text-sm sm:text-base text-zinc-600 leading-relaxed max-w-2xl mx-auto">
+                Speak customer loan details with automated transcription to Excel, lookup physical diary pages, and calculate compound interest cleanly.
               </p>
             </div>
 
             {/* PRIMARY OPTION CARDS */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-              {/* Card 1: Data Input (500+ Continuous Voice to Excel) */}
+              {/* Card 1: Data Input (Voice to Excel) */}
               <div
                 onClick={() => setCurrentView('BULK_INPUT')}
-                className="cursor-pointer group relative bg-gradient-to-br from-gold-500/15 via-[#1c0733] to-[#130324] p-8 rounded-3xl border-2 border-gold-400/50 hover:border-gold-300 shadow-card hover:shadow-card-hover transition-all duration-300 flex flex-col justify-between"
+                className="cursor-pointer group bg-white p-7 rounded-2xl border border-zinc-200 hover:border-purple-400 shadow-sm hover:shadow-card-hover transition-all duration-200 flex flex-col justify-between"
               >
                 <div>
-                  <div className="w-14 h-14 rounded-2xl bg-gold-500/20 border border-gold-300/60 flex items-center justify-center text-gold-300 mb-6 group-hover:scale-110 group-hover:bg-gold-500/30 transition-all duration-300 shadow-gold-glow">
-                    <Mic className="w-7 h-7 animate-pulse" />
+                  <div className="w-12 h-12 rounded-xl bg-purple-600 flex items-center justify-center text-white mb-5 shadow-sm group-hover:scale-105 transition-transform">
+                    <Mic className="w-6 h-6" />
                   </div>
-                  <div className="inline-block px-2.5 py-0.5 rounded-full bg-gold-500 text-purple-950 text-[10px] font-black uppercase tracking-wider mb-2">
+                  <div className="inline-block px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 text-[10px] font-bold uppercase tracking-wider mb-2 border border-purple-100">
                     Continuous Speech
                   </div>
-                  <h2 className="text-2xl font-bold text-white group-hover:text-gold-300 transition-colors">
-                    Data Input (500+)
+                  <h2 className="text-xl font-bold text-zinc-900 group-hover:text-purple-700 transition-colors">
+                    Voice Data Input
                   </h2>
-                  <p className="text-xs sm:text-sm text-purple-200/70 mt-2 font-normal leading-relaxed">
-                    Speak 500+ customers at once. Automatically streams into an Excel spreadsheet with zero repeated confirmation prompts.
+                  <p className="text-xs sm:text-sm text-zinc-500 mt-2 font-normal leading-relaxed">
+                    Speak customer loan records continuously. Stream into an Excel spreadsheet with review cards and one-click database commit.
                   </p>
                 </div>
 
-                <div className="mt-6 pt-5 border-t border-purple-500/20 flex items-center justify-between text-gold-300 font-bold text-xs sm:text-sm">
+                <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center justify-between text-purple-700 font-semibold text-xs sm:text-sm">
                   <span>Start Voice Entry</span>
-                  <div className="w-7 h-7 rounded-full bg-gold-500/20 flex items-center justify-center group-hover:bg-gold-500 group-hover:text-purple-950 transition-all">
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                  <div className="w-7 h-7 rounded-full bg-purple-50 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                    <ArrowRight className="w-4 h-4" />
                   </div>
                 </div>
               </div>
@@ -193,24 +211,24 @@ export default function HomePage() {
                   setSelectedCustomer(null);
                   setCurrentView('CUSTOMERS');
                 }}
-                className="cursor-pointer group relative bg-[#130324]/80 hover:bg-[#1c0733] p-8 rounded-3xl border border-purple-500/20 hover:border-gold-400/50 shadow-card hover:shadow-card-hover transition-all duration-300 flex flex-col justify-between"
+                className="cursor-pointer group bg-white p-7 rounded-2xl border border-zinc-200 hover:border-purple-400 shadow-sm hover:shadow-card-hover transition-all duration-200 flex flex-col justify-between"
               >
                 <div>
-                  <div className="w-14 h-14 rounded-2xl bg-gold-500/10 border border-gold-400/30 flex items-center justify-center text-gold-400 mb-6 group-hover:scale-110 transition-all duration-300 shadow-sm">
-                    <Users className="w-7 h-7" />
+                  <div className="w-12 h-12 rounded-xl bg-zinc-100 group-hover:bg-purple-50 flex items-center justify-center text-zinc-700 group-hover:text-purple-700 mb-5 transition-all">
+                    <Users className="w-6 h-6" />
                   </div>
-                  <h2 className="text-2xl font-bold text-white group-hover:text-gold-300 transition-colors">
-                    Customer Details
+                  <h2 className="text-xl font-bold text-zinc-900 group-hover:text-purple-700 transition-colors">
+                    Customer Accounts
                   </h2>
-                  <p className="text-xs sm:text-sm text-purple-200/70 mt-2 font-normal leading-relaxed">
-                    Search customer names and villages, view physical diary & page references, active vault ornaments, and single loan entry.
+                  <p className="text-xs sm:text-sm text-zinc-500 mt-2 font-normal leading-relaxed">
+                    Search customer names and villages, lookup physical diary and page numbers, inspect vault ornaments, and add individual loans.
                   </p>
                 </div>
 
-                <div className="mt-6 pt-5 border-t border-purple-500/10 flex items-center justify-between text-gold-400 font-semibold text-xs sm:text-sm">
+                <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center justify-between text-zinc-700 group-hover:text-purple-700 font-semibold text-xs sm:text-sm">
                   <span>View Accounts ({data.customers.length})</span>
-                  <div className="w-7 h-7 rounded-full bg-gold-500/10 flex items-center justify-center group-hover:bg-gold-500 group-hover:text-purple-950 transition-all">
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                  <div className="w-7 h-7 rounded-full bg-zinc-100 group-hover:bg-purple-600 group-hover:text-white flex items-center justify-center transition-colors">
+                    <ArrowRight className="w-4 h-4" />
                   </div>
                 </div>
               </div>
@@ -218,63 +236,63 @@ export default function HomePage() {
               {/* Card 3: Compound Interest Calculator */}
               <div
                 onClick={() => setCurrentView('CALCULATOR')}
-                className="cursor-pointer group relative bg-[#130324]/80 hover:bg-[#1c0733] p-8 rounded-3xl border border-purple-500/20 hover:border-gold-400/50 shadow-card hover:shadow-card-hover transition-all duration-300 flex flex-col justify-between"
+                className="cursor-pointer group bg-white p-7 rounded-2xl border border-zinc-200 hover:border-purple-400 shadow-sm hover:shadow-card-hover transition-all duration-200 flex flex-col justify-between"
               >
                 <div>
-                  <div className="w-14 h-14 rounded-2xl bg-gold-500/10 border border-gold-400/30 flex items-center justify-center text-gold-400 mb-6 group-hover:scale-110 transition-all duration-300 shadow-sm">
-                    <Calculator className="w-7 h-7" />
+                  <div className="w-12 h-12 rounded-xl bg-zinc-100 group-hover:bg-purple-50 flex items-center justify-center text-zinc-700 group-hover:text-purple-700 mb-5 transition-all">
+                    <Calculator className="w-6 h-6" />
                   </div>
-                  <h2 className="text-2xl font-bold text-white group-hover:text-gold-300 transition-colors">
+                  <h2 className="text-xl font-bold text-zinc-900 group-hover:text-purple-700 transition-colors">
                     Interest Calculator
                   </h2>
-                  <p className="text-xs sm:text-sm text-purple-200/70 mt-2 font-normal leading-relaxed">
-                    Independent jewellery loan utility with annual compounding. Calculate 1 to 20 items with custom rates and dates.
+                  <p className="text-xs sm:text-sm text-zinc-500 mt-2 font-normal leading-relaxed">
+                    Clean annual compounding utility. Defaults to a single item with flexible multi-item support and customizable interest rates.
                   </p>
                 </div>
 
-                <div className="mt-6 pt-5 border-t border-purple-500/10 flex items-center justify-between text-gold-400 font-semibold text-xs sm:text-sm">
+                <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center justify-between text-zinc-700 group-hover:text-purple-700 font-semibold text-xs sm:text-sm">
                   <span>Open Calculator</span>
-                  <div className="w-7 h-7 rounded-full bg-gold-500/10 flex items-center justify-center group-hover:bg-gold-500 group-hover:text-purple-950 transition-all">
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                  <div className="w-7 h-7 rounded-full bg-zinc-100 group-hover:bg-purple-600 group-hover:text-white flex items-center justify-center transition-colors">
+                    <ArrowRight className="w-4 h-4" />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Clean Clutter-Free Stats Bar */}
-            <div className="max-w-5xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-4">
-              <div className="bg-[#130324]/60 p-4 rounded-2xl border border-purple-500/15 text-center">
-                <span className="text-[11px] text-purple-200/60 font-semibold uppercase tracking-wider block">
+            {/* Clean Scandinavian Stats Bar */}
+            <div className="max-w-5xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-2">
+              <div className="bg-white p-4 rounded-xl border border-zinc-200 text-center shadow-sm">
+                <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider block">
                   Customers
                 </span>
-                <span className="text-2xl font-bold text-white mt-1 block">
+                <span className="text-2xl font-bold text-zinc-900 mt-1 block">
                   {data.customers.length}
                 </span>
               </div>
 
-              <div className="bg-[#130324]/60 p-4 rounded-2xl border border-purple-500/15 text-center">
-                <span className="text-[11px] text-purple-200/60 font-semibold uppercase tracking-wider block">
-                  Active Loans
+              <div className="bg-white p-4 rounded-xl border border-zinc-200 text-center shadow-sm">
+                <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider block">
+                  Active Principal
                 </span>
-                <span className="text-2xl font-bold text-emerald-400 mt-1 block">
+                <span className="text-2xl font-bold text-emerald-700 mt-1 block">
                   ₹{totalActivePrincipal.toLocaleString('en-IN')}
                 </span>
               </div>
 
-              <div className="bg-[#130324]/60 p-4 rounded-2xl border border-purple-500/15 text-center">
-                <span className="text-[11px] text-gold-300/80 font-semibold uppercase tracking-wider block">
+              <div className="bg-white p-4 rounded-xl border border-zinc-200 text-center shadow-sm">
+                <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider block">
                   Vault Gold
                 </span>
-                <span className="text-2xl font-bold text-gold-300 mt-1 block">
+                <span className="text-2xl font-bold text-purple-700 mt-1 block">
                   {totalActiveGoldGrams.toFixed(1)}g
                 </span>
               </div>
 
-              <div className="bg-[#130324]/60 p-4 rounded-2xl border border-purple-500/15 text-center">
-                <span className="text-[11px] text-slate-300/80 font-semibold uppercase tracking-wider block">
+              <div className="bg-white p-4 rounded-xl border border-zinc-200 text-center shadow-sm">
+                <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider block">
                   Vault Silver
                 </span>
-                <span className="text-2xl font-bold text-slate-200 mt-1 block">
+                <span className="text-2xl font-bold text-zinc-800 mt-1 block">
                   {totalActiveSilverGrams >= 1000
                     ? `${(totalActiveSilverGrams / 1000).toFixed(2)} kg`
                     : `${totalActiveSilverGrams.toFixed(0)}g`}
@@ -284,7 +302,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* VIEW 2: DATA INPUT TAB (500+ CONTINUOUS VOICE TO EXCEL STREAM) */}
+        {/* VIEW 2: DATA INPUT TAB */}
         {currentView === 'BULK_INPUT' && (
           <BulkDataInputTab
             appData={data}
@@ -324,20 +342,20 @@ export default function HomePage() {
         )}
       </main>
 
-      {/* Minimal Footer */}
-      <footer className="mt-auto py-6 border-t border-purple-500/10 bg-[#0a0114]/80 text-xs text-purple-200/50">
+      {/* Minimal Clean Footer */}
+      <footer className="mt-auto py-6 border-t border-zinc-200 bg-white text-xs text-zinc-500">
         <div className="max-w-6xl mx-auto px-4 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-gold-400/80 font-medium">
-            <Gem className="w-3.5 h-3.5" />
-            <span>Dahod Jewellery & Gold/Silver Lending</span>
+          <div className="flex items-center gap-2 text-zinc-700 font-medium">
+            <Gem className="w-3.5 h-3.5 text-purple-600" />
+            <span>Dahod Jewellery & Lending Ledger</span>
           </div>
-          <p>
-            Internal Family Lending Record • Physical Diary Remains Legal Source of Truth
+          <p className="text-zinc-400">
+            Internal Record • Physical Diary Remains Legal Source of Truth
           </p>
           <div>
             <button
               onClick={() => setIsExportModalOpen(true)}
-              className="text-gold-400 hover:text-gold-300 font-semibold transition-colors"
+              className="text-purple-700 hover:text-purple-900 font-semibold transition-colors"
             >
               Export Excel & Backup
             </button>

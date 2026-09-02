@@ -14,6 +14,7 @@ import {
   Trash2,
   CheckCircle2,
   Sparkles,
+  Volume2,
 } from 'lucide-react';
 
 interface NewLoanModalProps {
@@ -34,6 +35,10 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
   const [loanAmount, setLoanAmount] = useState<number>(50000);
   const [loanDate, setLoanDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
+  const [speechLang, setSpeechLang] = useState<'auto' | 'en' | 'hi'>('auto');
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
+
   const [ornaments, setOrnaments] = useState<Ornament[]>([
     {
       id: 'orn-init-1',
@@ -56,6 +61,7 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
       if (speechEngineRef.current) speechEngineRef.current.stop();
       setIsRecording(false);
       setIsProcessing(false);
+      setIsSpeaking(false);
       setLiveTranscript('');
       setLoanAmount(50000);
       setLoanDate(new Date().toISOString().split('T')[0]);
@@ -75,19 +81,25 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
 
   const startRecording = async () => {
     try {
-      setLiveTranscript('Recording raw audio from microphone...');
+      setLiveTranscript('Listening... Speak loan amount and ornament details in English or Hindi.');
       setIsRecording(true);
+      setIsSpeaking(false);
 
-      speechEngineRef.current = new CustomDirectAudioEngine('en');
+      speechEngineRef.current = new CustomDirectAudioEngine(speechLang);
       await speechEngineRef.current.start({
+        onAudioLevel: (lvl) => setAudioLevel(lvl),
+        onSpeechDetected: (speaking) => setIsSpeaking(speaking),
+        onInterimResult: (text) => setLiveTranscript(text),
         onError: (err) => {
           alert(err);
           setIsRecording(false);
+          setIsSpeaking(false);
         },
       });
     } catch (e) {
       console.warn('Start loan recording error:', e);
       setIsRecording(false);
+      setIsSpeaking(false);
     }
   };
 
@@ -95,10 +107,12 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
     if (!speechEngineRef.current) return;
     setIsRecording(false);
     setIsProcessing(true);
-    setLiveTranscript('Transcribing audio with Whisper AI...');
+    setIsSpeaking(false);
+    setLiveTranscript('Transcribing loan details with in-app engine (English & Hindi)...');
 
     const transcript = await speechEngineRef.current.stop();
     setIsProcessing(false);
+    setAudioLevel(0);
 
     if (transcript && transcript.trim()) {
       setLiveTranscript(transcript);
@@ -118,7 +132,7 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
         );
       }
     } else {
-      setLiveTranscript('No audio transcribed.');
+      setLiveTranscript('Microphone was quiet. Please speak closer to your microphone and try again.');
     }
   };
 
@@ -176,85 +190,157 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
   if (!isOpen || !customer) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0a0114]/80 backdrop-blur-md overflow-y-auto">
-      <div className="relative w-full max-w-2xl bg-[#130324] border border-purple-500/20 rounded-3xl p-6 sm:p-8 shadow-modal my-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/40 backdrop-blur-sm overflow-y-auto">
+      <div className="relative w-full max-w-2xl bg-white border border-zinc-200 rounded-2xl p-6 sm:p-8 shadow-xl my-6">
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-full bg-purple-900/40 hover:bg-purple-800 text-purple-200 hover:text-white transition-all"
+          className="absolute top-5 right-5 p-2 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-500 hover:text-zinc-800 transition-all"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4" />
         </button>
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-10 h-10 rounded-2xl bg-gold-500/10 border border-gold-400/30 flex items-center justify-center text-gold-400">
+          <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-700">
             <Coins className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+            <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 tracking-tight">
               New Loan for {customer.name}
             </h2>
-            <p className="text-xs text-purple-200/60 font-medium">
-              Village: <strong className="text-gold-300">{customer.village}</strong> • {customer.diary}, Page {customer.pageNumber}
+            <p className="text-xs text-zinc-500 font-medium">
+              Village: <strong className="text-purple-700">{customer.village}</strong> • {customer.diary}, Page {customer.pageNumber}
             </p>
           </div>
         </div>
 
-        {/* Voice Bar */}
-        <div className="bg-[#1c0733] p-4 rounded-2xl border border-purple-500/15 flex items-center justify-between gap-3 mb-5">
+        {/* Voice Bar with Language Switcher */}
+        <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-5">
           <div className="space-y-0.5">
-            <span className="text-[11px] font-bold text-gold-300 uppercase tracking-wider flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-gold-400" />
-              <span>Direct Audio Voice Capture</span>
-            </span>
-            <p className="text-xs text-purple-200/70">
-              Speak amount and ornaments (e.g. *"500g silver kandora and 200g silver kada for 50,000 rupees"*).
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold text-purple-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                <span>Voice Loan Entry</span>
+              </span>
+              {/* Language Pills */}
+              <div className="flex items-center bg-zinc-200/80 p-0.5 rounded-full text-[10px] font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setSpeechLang('auto')}
+                  className={`px-2 py-0.5 rounded-full transition-all ${
+                    speechLang === 'auto' ? 'bg-white text-purple-700 shadow-sm font-bold' : 'text-zinc-600'
+                  }`}
+                >
+                  Auto
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSpeechLang('en')}
+                  className={`px-2 py-0.5 rounded-full transition-all ${
+                    speechLang === 'en' ? 'bg-white text-purple-700 shadow-sm font-bold' : 'text-zinc-600'
+                  }`}
+                >
+                  EN
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSpeechLang('hi')}
+                  className={`px-2 py-0.5 rounded-full transition-all ${
+                    speechLang === 'hi' ? 'bg-white text-purple-700 shadow-sm font-bold' : 'text-zinc-600'
+                  }`}
+                >
+                  हिन्दी
+                </button>
+              </div>
+            </div>
+            <p className="text-xs text-zinc-500">
+              Speak amount and ornaments (e.g. *"500g silver kandora for 50,000 rupees"* or *"500 ग्राम चांदी कंदोरा पचास हजार रुपये"*).
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={isRecording ? stopRecording : startRecording}
-            disabled={isProcessing}
-            className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full font-bold text-xs transition-all flex-shrink-0 active:scale-95 ${
-              isRecording
-                ? 'bg-rose-600 text-white border border-rose-300 shadow-[0_0_20px_rgba(225,29,72,0.5)] animate-pulse'
-                : isProcessing
-                ? 'bg-purple-800 text-purple-300'
-                : 'bg-gold-500 hover:bg-gold-400 text-purple-950 shadow-gold-glow'
-            }`}
-          >
-            {isRecording ? (
-              <>
-                <MicOff className="w-3.5 h-3.5 animate-bounce" />
-                <span>STOP & TRANSCRIBE</span>
-              </>
-            ) : isProcessing ? (
-              <span>WAIT...</span>
-            ) : (
-              <>
-                <Mic className="w-3.5 h-3.5" />
-                <span>Speak</span>
-              </>
+          <div className="flex items-center gap-2 self-start sm:self-center">
+            {isRecording && (
+              <div className="flex items-center gap-1 h-6 px-2 py-1 bg-white rounded-lg border border-zinc-200">
+                <Volume2 className="w-3.5 h-3.5 text-purple-600" />
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`w-1 rounded-full transition-all duration-75 ${
+                      isSpeaking ? 'bg-purple-600' : 'bg-zinc-300'
+                    }`}
+                    style={{
+                      height: `${Math.max(3, Math.round(audioLevel * 18 * (0.4 + 0.6 * Math.sin(i + Date.now() / 150))))}px`,
+                    }}
+                  />
+                ))}
+              </div>
             )}
-          </button>
+
+            <button
+              type="button"
+              onClick={isRecording ? stopRecording : startRecording}
+              disabled={isProcessing}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-full font-semibold text-xs transition-all flex-shrink-0 ${
+                isRecording
+                  ? 'bg-rose-600 text-white shadow-sm animate-pulse'
+                  : isProcessing
+                  ? 'bg-zinc-200 text-zinc-400'
+                  : 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm'
+              }`}
+            >
+              {isRecording ? (
+                <>
+                  <MicOff className="w-3.5 h-3.5" />
+                  <span>Stop</span>
+                </>
+              ) : isProcessing ? (
+                <span>Wait...</span>
+              ) : (
+                <>
+                  <Mic className="w-3.5 h-3.5" />
+                  <span>Speak</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
-        {liveTranscript && (
-          <div className="bg-[#1c0733] p-3 rounded-2xl border border-purple-500/20 text-xs mb-4">
-            <span className="font-semibold text-gold-300 uppercase text-[10px] block mb-0.5">
-              Transcription Output:
-            </span>
-            <p className="text-xs font-medium text-white italic">"{liveTranscript}"</p>
+        {(isRecording || liveTranscript) && (
+          <div className="bg-white p-4 rounded-xl border-2 border-purple-500/30 shadow-sm text-xs space-y-1.5 mb-4 animate-in fade-in">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-purple-800 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                {isRecording ? (
+                  <>
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-600"></span>
+                    </span>
+                    <span>Live Speech Stream:</span>
+                  </>
+                ) : (
+                  <span>Transcription Output:</span>
+                )}
+              </span>
+              <span className="text-[10px] text-zinc-400 font-medium">
+                {isRecording ? (isSpeaking ? 'Speaking...' : 'Listening...') : 'Complete'}
+              </span>
+            </div>
+            <p className="text-sm font-semibold text-zinc-900 leading-relaxed min-h-[36px] bg-zinc-50 p-2.5 rounded-lg border border-zinc-200">
+              {liveTranscript || (
+                <span className="text-zinc-400 font-normal italic">
+                  Speak now... words appear live as you talk.
+                </span>
+              )}
+            </p>
           </div>
         )}
 
         <form onSubmit={handleSave} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-[#1c0733] p-4 rounded-2xl border border-purple-500/15">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-zinc-50 p-4 rounded-xl border border-zinc-200">
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gold-300">
-                Loan Amount (₹) <span className="text-rose-400">*</span>
+              <label className="text-xs font-semibold text-zinc-700">
+                Loan Amount (₹) <span className="text-rose-500">*</span>
               </label>
               <input
                 type="number"
@@ -262,35 +348,35 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
                 required
                 value={loanAmount}
                 onChange={(e) => setLoanAmount(parseFloat(e.target.value) || 0)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-[#130324] border border-gold-500/50 text-gold-300 font-bold text-lg focus:outline-none"
+                className="w-full px-3.5 py-2 rounded-lg bg-white border border-zinc-200 text-purple-700 font-bold text-base focus:border-purple-500 focus:outline-none"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-purple-200/80">
-                Loan Date <span className="text-rose-400">*</span>
+              <label className="text-xs font-semibold text-zinc-700">
+                Loan Date <span className="text-rose-500">*</span>
               </label>
               <input
                 type="date"
                 required
                 value={loanDate}
                 onChange={(e) => setLoanDate(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-[#130324] border border-purple-500/20 text-white font-medium text-sm focus:outline-none"
+                className="w-full px-3.5 py-2 rounded-lg bg-white border border-zinc-200 text-zinc-800 font-medium text-xs focus:border-purple-500 focus:outline-none"
               />
             </div>
           </div>
 
-          <div className="bg-[#1c0733] p-4 rounded-2xl border border-purple-500/15 space-y-3">
+          <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-200 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-gold-300 uppercase tracking-wider flex items-center gap-1.5">
-                <Gem className="w-3.5 h-3.5 text-gold-400" />
+              <span className="text-xs font-bold text-zinc-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Gem className="w-3.5 h-3.5 text-purple-600" />
                 <span>Pledged Ornaments ({ornaments.length})</span>
               </span>
 
               <button
                 type="button"
                 onClick={addOrnament}
-                className="flex items-center gap-1 text-[11px] font-bold text-gold-400 hover:text-gold-300 bg-gold-500/10 px-2.5 py-1 rounded-full border border-gold-500/20"
+                className="flex items-center gap-1 text-[11px] font-semibold text-purple-700 hover:text-purple-900 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-100"
               >
                 <Plus className="w-3 h-3" />
                 <span>Add Item</span>
@@ -301,17 +387,17 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
               {ornaments.map((orn, idx) => (
                 <div
                   key={orn.id || idx}
-                  className="bg-[#130324] p-3 rounded-2xl border border-purple-500/15 space-y-2 text-xs"
+                  className="bg-white p-3 rounded-xl border border-zinc-200 shadow-sm space-y-2 text-xs"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-gold-300/80 text-[10px] uppercase">
+                    <span className="font-semibold text-purple-700 text-[10px] uppercase">
                       Item #{idx + 1}
                     </span>
                     {ornaments.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeOrnament(idx)}
-                        className="text-[11px] text-rose-400 hover:text-rose-300 flex items-center gap-1 font-medium"
+                        className="text-[11px] text-rose-600 hover:text-rose-800 flex items-center gap-1 font-medium"
                       >
                         <Trash2 className="w-3 h-3" />
                         <span>Remove</span>
@@ -321,23 +407,23 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <div>
-                      <label className="text-[10px] font-medium text-purple-200/60 block mb-0.5">Metal</label>
+                      <label className="text-[10px] font-medium text-zinc-500 block mb-0.5">Metal</label>
                       <select
                         value={orn.metal}
                         onChange={(e) => updateOrnament(idx, { metal: e.target.value as MetalType })}
-                        className="w-full px-2 py-1.5 rounded-lg bg-[#1c0733] border border-purple-500/20 text-white font-semibold text-xs"
+                        className="w-full px-2 py-1.5 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-800 font-medium text-xs focus:bg-white focus:border-purple-500"
                       >
-                        <option value="Gold">🪙 Gold (સોનું)</option>
-                        <option value="Silver">🥈 Silver (ચાંદી)</option>
+                        <option value="Gold">🪙 Gold (સોનું / सोना)</option>
+                        <option value="Silver">🥈 Silver (ચાંદી / चांदी)</option>
                       </select>
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-medium text-purple-200/60 block mb-0.5">Category</label>
+                      <label className="text-[10px] font-medium text-zinc-500 block mb-0.5">Category</label>
                       <select
                         value={orn.category}
                         onChange={(e) => updateOrnament(idx, { category: e.target.value })}
-                        className="w-full px-2 py-1.5 rounded-lg bg-[#1c0733] border border-purple-500/20 text-white font-semibold text-xs"
+                        className="w-full px-2 py-1.5 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-800 font-medium text-xs focus:bg-white focus:border-purple-500"
                       >
                         {categories.map((cat) => (
                           <option key={cat} value={cat}>
@@ -348,25 +434,25 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-medium text-gold-300 block mb-0.5">Weight (g)</label>
+                      <label className="text-[10px] font-medium text-zinc-600 block mb-0.5">Weight (g)</label>
                       <input
                         type="number"
                         step="0.1"
                         required
                         value={orn.weight}
                         onChange={(e) => updateOrnament(idx, { weight: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-2 py-1.5 rounded-lg bg-[#1c0733] border border-gold-500/30 text-gold-300 font-bold text-xs"
+                        className="w-full px-2 py-1.5 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-900 font-bold text-xs focus:bg-white focus:border-purple-500"
                       />
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-medium text-purple-200/60 block mb-0.5">Quantity</label>
+                      <label className="text-[10px] font-medium text-zinc-500 block mb-0.5">Quantity</label>
                       <input
                         type="number"
                         min="1"
                         value={orn.quantity}
                         onChange={(e) => updateOrnament(idx, { quantity: parseInt(e.target.value, 10) || 1 })}
-                        className="w-full px-2 py-1.5 rounded-lg bg-[#1c0733] border border-purple-500/20 text-white text-xs"
+                        className="w-full px-2 py-1.5 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-800 text-xs focus:bg-white focus:border-purple-500"
                       />
                     </div>
                   </div>
@@ -377,7 +463,7 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
                       value={orn.description || ''}
                       onChange={(e) => updateOrnament(idx, { description: e.target.value })}
                       placeholder="Optional notes (e.g. Heavy Kandora with floral bells)"
-                      className="w-full px-2.5 py-1 rounded-lg bg-[#1c0733] border border-purple-500/15 text-purple-200/70 text-[11px]"
+                      className="w-full px-2.5 py-1 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-600 text-[11px] focus:bg-white focus:border-purple-500"
                     />
                   </div>
                 </div>
@@ -386,13 +472,13 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-purple-200/70">Notes (Optional)</label>
+            <label className="text-xs font-semibold text-zinc-600">Notes (Optional)</label>
             <input
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. Lent against silver ornaments"
-              className="w-full px-3 py-2 rounded-xl bg-[#1c0733] border border-purple-500/20 text-purple-200 text-xs focus:outline-none"
+              className="w-full px-3 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-800 text-xs focus:bg-white focus:border-purple-500 focus:outline-none"
             />
           </div>
 
@@ -400,13 +486,13 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-full text-purple-200/70 hover:text-white font-medium text-xs"
+              className="px-4 py-2 rounded-full text-zinc-500 hover:text-zinc-800 font-medium text-xs"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-gold-500 hover:bg-gold-400 text-purple-950 font-bold text-xs shadow-gold-glow transition-all"
+              className="flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs shadow-sm transition-all"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>Save Loan</span>

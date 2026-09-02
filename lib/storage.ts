@@ -4,27 +4,99 @@ import * as XLSX from 'xlsx';
 
 const STORAGE_KEY = 'dahod_jewellery_lending_data_v2';
 
+export function resetToSampleData(): AppData {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(initialAppData));
+    } catch (e) {
+      console.warn('Failed to reset storage:', e);
+    }
+  }
+  return initialAppData;
+}
+
 export function getStoredData(): AppData {
   if (typeof window === 'undefined') return initialAppData;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(initialAppData));
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(initialAppData));
+      } catch (e) {}
       return initialAppData;
     }
     const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') {
+      return initialAppData;
+    }
+
+    // Sanitize customers to prevent any missing field crashes
+    const rawCustomers = Array.isArray(parsed.customers) ? parsed.customers : initialAppData.customers;
+    const sanitizedCustomers: Customer[] = rawCustomers
+      .filter((c: any) => c && typeof c === 'object')
+      .map((c: any, idx: number) => ({
+        id: String(c.id || `cust-saved-${idx}`),
+        name: String(c.name || 'Customer'),
+        village: String(c.village || 'Dahod'),
+        diary: String(c.diary || 'Diary 2026'),
+        pageNumber: String(c.pageNumber || `${idx + 1}`),
+        mobile: c.mobile ? String(c.mobile) : undefined,
+        createdAt: c.createdAt || new Date().toISOString(),
+        updatedAt: c.updatedAt || new Date().toISOString(),
+      }));
+
+    // Sanitize loans to ensure ornaments array and numeric values exist
+    const rawLoans = Array.isArray(parsed.loans) ? parsed.loans : initialAppData.loans;
+    const sanitizedLoans: Loan[] = rawLoans
+      .filter((l: any) => l && typeof l === 'object')
+      .map((l: any, idx: number) => ({
+        id: String(l.id || `loan-saved-${idx}`),
+        customerId: String(l.customerId || ''),
+        loanDate: String(l.loanDate || new Date().toISOString().split('T')[0]),
+        loanAmount: Number(l.loanAmount) || 0,
+        status: (l.status === 'CLOSED' ? 'CLOSED' : 'ACTIVE') as LoanStatus,
+        closedDate: l.closedDate ? String(l.closedDate) : undefined,
+        ornaments: Array.isArray(l.ornaments)
+          ? l.ornaments
+              .filter((o: any) => o && typeof o === 'object')
+              .map((o: any, oIdx: number) => ({
+                id: String(o.id || `orn-${idx}-${oIdx}`),
+                metal: (o.metal === 'Gold' ? 'Gold' : 'Silver') as Ornament['metal'],
+                category: String(o.category || 'Ornaments'),
+                weight: Number(o.weight) || 0,
+                quantity: Number(o.quantity) || 1,
+                description: o.description ? String(o.description) : undefined,
+              }))
+          : [],
+        notes: l.notes ? String(l.notes) : undefined,
+        createdAt: l.createdAt || new Date().toISOString(),
+        updatedAt: l.updatedAt || new Date().toISOString(),
+      }));
+
+    const rawLogs = Array.isArray(parsed.activityLogs) ? parsed.activityLogs : initialAppData.activityLogs;
+    const sanitizedLogs: ActivityLog[] = rawLogs
+      .filter((log: any) => log && typeof log === 'object')
+      .map((log: any, idx: number) => ({
+        id: String(log.id || `act-saved-${idx}`),
+        timestamp: String(log.timestamp || new Date().toISOString()),
+        user: String(log.user || 'Family Admin'),
+        action: log.action || 'ADD_LOAN',
+        customerName: String(log.customerName || 'Customer'),
+        village: String(log.village || 'Dahod'),
+        details: String(log.details || ''),
+      }));
+
     return {
-      ...initialAppData,
-      ...parsed,
-      customers: parsed.customers || initialAppData.customers,
-      loans: parsed.loans || initialAppData.loans,
-      activityLogs: parsed.activityLogs || initialAppData.activityLogs,
-      villages: parsed.villages || initialAppData.villages,
-      ornamentCategories: parsed.ornamentCategories || initialAppData.ornamentCategories,
-      diaries: parsed.diaries || initialAppData.diaries,
+      customers: sanitizedCustomers.length > 0 ? sanitizedCustomers : initialAppData.customers,
+      loans: sanitizedLoans,
+      activityLogs: sanitizedLogs,
+      villages: Array.isArray(parsed.villages) && parsed.villages.length > 0 ? parsed.villages : initialAppData.villages,
+      ornamentCategories: Array.isArray(parsed.ornamentCategories) && parsed.ornamentCategories.length > 0 ? parsed.ornamentCategories : initialAppData.ornamentCategories,
+      diaries: Array.isArray(parsed.diaries) && parsed.diaries.length > 0 ? parsed.diaries : initialAppData.diaries,
+      defaultAnnualInterestRate: Number(parsed.defaultAnnualInterestRate) || 18.0,
     };
   } catch (err) {
-    console.error('Error reading data from storage:', err);
+    console.error('Error reading data from storage, recovering with default data:', err);
     return initialAppData;
   }
 }
@@ -375,24 +447,30 @@ export function commitBulkRecordsToDatabase(data: AppData, records: BulkCustomer
   let updatedData = { ...data };
   const today = new Date().toISOString().split('T')[0];
 
-  records.forEach((rec) => {
+  (records || []).forEach((rec) => {
+    if (!rec) return;
+    const safeName = (rec.name || 'Customer').trim();
+    const safeVillage = (rec.village || 'Dahod').trim();
+
     // 1. Create or Find Customer
-    let cust = updatedData.customers.find(
-      (c) => c.name.toLowerCase() === rec.name.toLowerCase() && c.village.toLowerCase() === rec.village.toLowerCase()
+    let cust = (updatedData.customers || []).find(
+      (c) => c && c.name && c.village &&
+        c.name.toLowerCase() === safeName.toLowerCase() &&
+        c.village.toLowerCase() === safeVillage.toLowerCase()
     );
 
     if (!cust) {
       const newCust: Customer = {
         id: `cust-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        name: rec.name.trim(),
-        village: rec.village.trim() || 'Dahod',
-        diary: rec.diary.trim() || 'Diary 2026',
-        pageNumber: rec.pageNumber.trim() || '1',
-        mobile: rec.mobile ? rec.mobile.trim() : undefined,
+        name: safeName,
+        village: safeVillage,
+        diary: (rec.diary || 'Diary 2026').trim(),
+        pageNumber: (rec.pageNumber || '1').trim(),
+        mobile: rec.mobile ? String(rec.mobile).trim() : undefined,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      updatedData.customers = [newCust, ...updatedData.customers];
+      updatedData.customers = [newCust, ...(updatedData.customers || [])];
       cust = newCust;
     }
 
@@ -406,33 +484,33 @@ export function commitBulkRecordsToDatabase(data: AppData, records: BulkCustomer
       ornaments: [
         {
           id: `orn-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          metal: rec.metal,
-          category: rec.category,
-          weight: rec.weight,
-          quantity: rec.quantity,
+          metal: rec.metal || 'Silver',
+          category: rec.category || 'Kandora',
+          weight: Number(rec.weight) || 500,
+          quantity: Number(rec.quantity) || 1,
           description: rec.rawSpeech || '',
         },
       ],
-      notes: `Bulk voice entry: ${rec.rawSpeech}`,
+      notes: `Bulk voice entry: ${rec.rawSpeech || ''}`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    updatedData.loans = [newLoan, ...updatedData.loans];
+    updatedData.loans = [newLoan, ...(updatedData.loans || [])];
   });
 
   // Ensure villages and categories are up to date
-  const villageSet = new Set(updatedData.villages);
-  records.forEach((r) => {
-    if (r.village) villageSet.add(r.village);
+  const villageSet = new Set(updatedData.villages || []);
+  (records || []).forEach((r) => {
+    if (r && r.village) villageSet.add(r.village.trim());
   });
   updatedData.villages = Array.from(villageSet);
 
   updatedData = recordActivity(
     updatedData,
     'BULK_IMPORT',
-    `${records.length} Bulk Customers`,
+    `${(records || []).length} Bulk Customers`,
     'Dahod Region',
-    `Imported ${records.length} customer loan accounts from bulk voice input session.`
+    `Imported ${(records || []).length} customer loan accounts from bulk voice input session.`
   );
 
   saveStoredData(updatedData);

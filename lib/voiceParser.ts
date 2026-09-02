@@ -1,6 +1,6 @@
 import { MetalType, ParsedCustomerVoice, ParsedLoanVoice, BulkCustomerLoanRecord } from './types';
 
-// Helper to convert spoken number words into integers
+// Helper to convert spoken number words (English, Hindi, Gujarati, Hinglish) into integers
 export function parseSpokenNumber(text: string): number | null {
   const clean = text.toLowerCase().replace(/,/g, '').trim();
 
@@ -8,33 +8,84 @@ export function parseSpokenNumber(text: string): number | null {
   const directMatch = clean.match(/(\d+(\.\d+)?)/);
   if (directMatch) {
     let num = parseFloat(directMatch[1]);
-    if (clean.includes('lakh') || clean.includes('lac') || clean.includes('લાખ') || clean.includes('लाख')) {
+    if (
+      clean.includes('lakh') ||
+      clean.includes('lac') ||
+      clean.includes('લાખ') ||
+      clean.includes('लाख')
+    ) {
       num *= 100000;
-    } else if (clean.includes('thousand') || clean.includes('k') || clean.includes('હજાર') || clean.includes('हज़ार')) {
+    } else if (
+      clean.includes('thousand') ||
+      clean.includes('hazar') ||
+      clean.includes('hazaar') ||
+      clean.includes('k') ||
+      clean.includes('હજાર') ||
+      clean.includes('हज़ार') ||
+      clean.includes('हजार')
+    ) {
       num *= 1000;
     }
     return Math.round(num * 100) / 100;
   }
 
-  // Word-based numbers
+  // Word-based numbers in English, Hindi, and Gujarati
   const wordsMap: Record<string, number> = {
+    // English
     'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
     'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
-    'twenty': 20, 'thirty': 30, 'forty': 40, 'fifty': 50,
-    'sixty': 60, 'seventy': 70, 'eighty': 80, 'ninety': 90,
+    'eleven': 11, 'twelve': 12, 'thirteen': 13, 'fourteen': 14, 'fifteen': 15,
+    'sixteen': 16, 'seventeen': 17, 'eighteen': 18, 'nineteen': 19,
+    'twenty': 20, 'twenty-five': 25, 'thirty': 30, 'thirty-five': 35,
+    'forty': 40, 'forty-five': 45, 'fifty': 50, 'sixty': 60,
+    'seventy': 70, 'eighty': 80, 'ninety': 90,
     'hundred': 100, 'thousand': 1000, 'lakh': 100000, 'lac': 100000,
-    'પચાસ': 50, 'સાઠ': 60, 'સિત્તેર': 70, 'એંસી': 80, 'નેવું': 90, 'સો': 100, 'હજાર': 1000, 'લાખ': 100000,
-    'पचास': 50, 'साठ': 60, 'सत्तर': 70, 'अस्सी': 80, 'नब्बे': 90, 'सौ': 100, 'हज़ार': 1000, 'लाख': 100000,
+
+    // Hinglish (Romanized Hindi)
+    'ek': 1, 'do': 2, 'teen': 3, 'char': 4, 'chaar': 4, 'paanch': 5, 'panch': 5,
+    'chhah': 6, 'che': 6, 'saat': 7, 'aath': 8, 'nau': 9, 'dus': 10, 'das': 10,
+    'gyarah': 11, 'barah': 12, 'terah': 13, 'chaudah': 14, 'pandrah': 15,
+    'solah': 16, 'satrah': 17, 'atharah': 18, 'unnees': 19, 'bees': 20,
+    'pachees': 25, 'pachis': 25, 'pachchis': 25, 'tees': 30, 'chalees': 40,
+    'pachas': 50, 'pachaas': 50, 'sath': 60, 'saath': 60, 'sattar': 70,
+    'assi': 80, 'nabbe': 90, 'sau': 100, 'hazar': 1000, 'hazaar': 1000,
+
+    // Gujarati
+    'એક': 1, 'બે': 2, 'ત્રણ': 3, 'ચાર': 4, 'પાંચ': 5,
+    'છ': 6, 'સાત': 7, 'આઠ': 8, 'નવ': 9, 'દસ': 10,
+    'પચીસ': 25, 'ત્રીસ': 30, 'ચાલીસ': 40, 'પચાસ': 50,
+    'સાઠ': 60, 'સિત્તેર': 70, 'એંસી': 80, 'નેવું': 90,
+    'સો': 100, 'હજાર': 1000, 'લાખ': 100000,
+
+    // Hindi (Devanagari)
+    'एक': 1, 'दो': 2, 'तीन': 3, 'चार': 4, 'पांच': 5, 'पाँच': 5,
+    'छह': 6, 'सात': 7, 'आठ': 8, 'नौ': 9, 'दस': 10,
+    'ग्यारह': 11, 'बारह': 12, 'तेरह': 13, 'चौदह': 14, 'पंद्रह': 15,
+    'सोलह': 16, 'सत्रह': 17, 'अट्ठारह': 18, 'उन्नीस': 19, 'बीस': 20,
+    'पच्चीस': 25, 'तीस': 30, 'पैंतीस': 35, 'चालीस': 40, 'पैंतालीस': 45,
+    'पचास': 50, 'साठ': 60, 'सत्तर': 70, 'अस्सी': 80, 'नब्बे': 90,
+    'सौ': 100, 'हज़ार': 1000, 'हजार': 1000, 'लाख': 100000,
   };
+
+  // Check compound multiplier e.g. "pachas hazar", "ek lakh", "50 hazar"
+  const isThousand =
+    clean.includes('thousand') ||
+    clean.includes('hazar') ||
+    clean.includes('hazaar') ||
+    clean.includes('હજાર') ||
+    clean.includes('हज़ार') ||
+    clean.includes('हजार');
+
+  const isLakh =
+    clean.includes('lakh') ||
+    clean.includes('lac') ||
+    clean.includes('લાખ') ||
+    clean.includes('लाख');
 
   for (const [w, val] of Object.entries(wordsMap)) {
     if (clean.includes(w)) {
-      if (clean.includes('thousand') || clean.includes('હજાર') || clean.includes('हज़ार')) {
-        return val < 1000 ? val * 1000 : val;
-      }
-      if (clean.includes('lakh') || clean.includes('લાખ') || clean.includes('लाख')) {
-        return val < 100000 ? val * 100000 : val;
-      }
+      if (isLakh && val < 100) return val * 100000;
+      if (isThousand && val < 1000) return val * 1000;
       return val;
     }
   }
@@ -42,7 +93,7 @@ export function parseSpokenNumber(text: string): number | null {
   return null;
 }
 
-// 1. Single Customer Voice Parsing
+// 1. Single Customer Voice Parsing (English & Hindi)
 export function parseSingleCustomerVoice(rawText: string, knownVillages: string[] = []): ParsedCustomerVoice {
   let text = rawText
     .replace(/thank you for watching\.?/gi, '')
@@ -67,8 +118,8 @@ export function parseSingleCustomerVoice(rawText: string, knownVillages: string[
     mobile = mobileMatch[0];
   }
 
-  // 2. Extract Diary Reference (ONLY if explicitly mentioned)
-  const diaryMatch = text.match(/(?:diary|ચોપડો|ડાયરી|book)\s*([A-Za-z0-9\-_]+(?:\s+[A-Za-z0-9]+)?)/i);
+  // 2. Extract Diary Reference (English, Hindi, Gujarati)
+  const diaryMatch = text.match(/(?:diary|ચોપડો|ડાયરી|डायरी|चोपड़ा|खाता|book)\s*([A-Za-z0-9\-_]+(?:\s+[A-Za-z0-9]+)?)/i);
   if (diaryMatch) {
     const dVal = diaryMatch[1].trim();
     diary = dVal.toLowerCase().startsWith('diary') ? dVal : `Diary ${dVal}`;
@@ -79,23 +130,29 @@ export function parseSingleCustomerVoice(rawText: string, knownVillages: string[
     }
   }
 
-  // 3. Extract Page Number (ONLY if explicitly mentioned)
-  const pageMatch = text.match(/(?:page|page number|p\.|પાના નંબર|પાનું|પેજ|પાનુ|પાન|પન્ના|पृष्ठ)\s*(?:no\.?|number)?\s*(\d+)/i);
+  // 3. Extract Page Number
+  const pageMatch = text.match(
+    /(?:page|page number|p\.|पाना नंबर|पाना|પાના નંબર|પાનું|પેજ|પાનુ|પાન|પન્ના|पन्ना नंबर|पन्ना|पृष्ठ|पेज नंबर|पेज)\s*(?:no\.?|number|संख्या)?\s*(\d+)/i
+  );
   if (pageMatch) {
     pageNumber = pageMatch[1];
   }
 
-  // 4. Extract Village
+  // 4. Extract Village (English, Hindi, Gujarati)
   const villagePatterns = [
-    /(?:from|resident of|village|at|ગામ|વાળા)\s+([A-Za-z\u0A80-\u0AFF\u0900-\u097F]+(?:\s+[A-Za-z\u0A80-\u0AFF\u0900-\u097F]+)?)/i,
-    /([A-Za-z\u0A80-\u0AFF\u0900-\u097F]+)\s+(?:village|gaam|ગામ)/i,
+    /(?:from|resident of|village|at|gaon|gaav|se|ka|ki|ગામ|વાળા|गांव|गाँव|से|का|की|निवासी)\s+([A-Za-z\u0A80-\u0AFF\u0900-\u097F]+(?:\s+[A-Za-z\u0A80-\u0AFF\u0900-\u097F]+)?)/i,
+    /([A-Za-z\u0A80-\u0AFF\u0900-\u097F]+)\s+(?:village|gaam|gaon|gaav|ગામ|गांव|गाँव)/i,
   ];
 
   for (const pat of villagePatterns) {
     const vMatch = text.match(pat);
     if (vMatch && vMatch[1]) {
       const candidate = vMatch[1].trim();
-      const ignored = ['diary', 'page', 'mobile', 'phone', 'customer', 'new', 'add', 'no', 'number', 'loan', 'rupees', 'gold', 'silver', 'thank', 'you'];
+      const ignored = [
+        'diary', 'page', 'mobile', 'phone', 'customer', 'new', 'add', 'no', 'number',
+        'loan', 'rupees', 'gold', 'silver', 'thank', 'you', 'kandora', 'chandi', 'sona',
+        'डायरी', 'पेज', 'लोन', 'रुपये', 'चांदी', 'सोना'
+      ];
       if (!ignored.includes(candidate.toLowerCase())) {
         village = candidate.charAt(0).toUpperCase() + candidate.slice(1);
         break;
@@ -115,24 +172,24 @@ export function parseSingleCustomerVoice(rawText: string, knownVillages: string[
   // 5. Extract Customer Name
   let cleanForName = text;
   if (village) {
-    cleanForName = cleanForName.replace(new RegExp(`(?:from|village|at|ગામ)?\s*${village}`, 'gi'), '');
+    cleanForName = cleanForName.replace(new RegExp(`(?:from|village|at|gaon|ગામ|गांव)?\s*${village}`, 'gi'), '');
   }
   if (diary) {
     cleanForName = cleanForName.replace(new RegExp(diary, 'gi'), '');
   }
   if (pageNumber) {
-    cleanForName = cleanForName.replace(new RegExp(`(?:page|p\.|પાના નંબર|પાનું)?\s*${pageNumber}`, 'gi'), '');
+    cleanForName = cleanForName.replace(new RegExp(`(?:page|p\.|पाना नंबर|પાના નંબર|पन्ना)?\s*${pageNumber}`, 'gi'), '');
   }
   if (mobile) {
     cleanForName = cleanForName.replace(mobile, '');
   }
 
   cleanForName = cleanForName
-    .replace(/\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:lakh|thousand|k|lac|rupees|rs|રૂપિયા|loan|amount)\b/gi, '')
-    .replace(/\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:gram|grams|gm|gms|g|tola|tole|ગ્રામ|તોલા)\b/gi, '')
+    .replace(/\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:lakh|thousand|hazar|k|lac|rupees|rs|રૂપિયા|रुपये|रुपए|loan|amount)\b/gi, '')
+    .replace(/\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:gram|grams|gm|gms|g|tola|tole|ગ્રામ|તોલા|ग्राम|तोला)\b/gi, '')
     .replace(/\b\d+\b/g, '')
-    .replace(/\b(?:gold|silver|sona|chandi|kandora|kada|chain|ring|necklace|mangalsutra|earrings|bangle|anklet|payal|utensils|coin|સોનું|ચાંદી|કંદોરો|કડા|ચેઇન|વીંટી|હાર|મંગળસૂત્ર)\b/gi, '')
-    .replace(/(?:customer|new customer|add customer|name is|શ્રી|નામ|\bno\.?\s*\d+|thank you|thanks|from|village|diary|page|loan|rupees|રૂપિયા)/gi, '')
+    .replace(/\b(?:gold|silver|sona|chandi|kandora|kada|chain|ring|necklace|mangalsutra|earrings|bangle|anklet|payal|utensils|coin|સોનું|ચાંદી|કંદોરો|કડા|ચેઇન|વીંટી|હાર|मંગળસૂત્ર|सोना|चांदी|कंदोरा|कड़ा|चेन|अंगूठी|पायल|हार|झुमका)\b/gi, '')
+    .replace(/(?:customer|new customer|add customer|name is|શ્રી|નામ|नाम|श्री|श्रीमती|\bno\.?\s*\d+|thank you|thanks|from|village|diary|page|loan|rupees|રૂપિયા|रुपये)/gi, '')
     .replace(/[^A-Za-z\u0A80-\u0AFF\u0900-\u097F\s]/g, '')
     .trim();
 
@@ -162,11 +219,11 @@ export function parseBulkCustomersVoice(rawText: string, knownVillages: string[]
 
   if (!text) return [];
 
-  let segments = text.split(/(?:\b\d+[\.\)]|\bCustomer\s*\d+:?|\bનંબર\s*\d+:?|\bnumber\s*\d+:?|\bnext\s*customer:?|\band\s+next:?)/i);
+  let segments = text.split(/(?:\b\d+[\.\)]|\bCustomer\s*\d+:?|\bનંબર\s*\d+:?|\bनंबर\s*\d+:?|\bnumber\s*\d+:?|\bnext\s*customer:?|\bagla\s*customer:?|\band\s+next:?)/i);
 
   if (segments.length <= 1) {
     const newline = String.fromCharCode(10);
-    segments = text.split(new RegExp('(?:;|' + newline + '|\band\s+then\b|\band\s+also\b)', 'i'));
+    segments = text.split(new RegExp('(?:;|' + newline + '|\band\s+then\b|\band\s+also\b|\baur\b)', 'i'));
   }
 
   const cleanedSegments = segments
@@ -178,12 +235,18 @@ export function parseBulkCustomersVoice(rawText: string, knownVillages: string[]
     return single.name ? [single] : [];
   }
 
-  return cleanedSegments
-    .map((seg) => parseSingleCustomerVoice(seg, knownVillages))
-    .filter((c) => c.name.length > 0);
+  const results: ParsedCustomerVoice[] = [];
+  for (const seg of cleanedSegments) {
+    const parsed = parseSingleCustomerVoice(seg, knownVillages);
+    if (parsed.name || parsed.village || parsed.pageNumber) {
+      results.push(parsed);
+    }
+  }
+
+  return results;
 }
 
-// 3. High-Throughput Bulk Voice to Excel Parser
+// 3. High-Throughput Bulk Voice to Excel Parser (English & Hindi)
 export function parseBulkVoiceToExcelRecords(
   rawText: string,
   knownVillages: string[] = [],
@@ -200,13 +263,13 @@ export function parseBulkVoiceToExcelRecords(
 
   if (!cleanSource || cleanSource.length < 2) return [];
 
-  const splitPattern = /(?:\b\d+[\.\)]|\bCustomer\s*\d+:?|\bનંબર\s*\d+:?|\bnumber\s*\d+:?|\bnext\s*customer:?|\bnext:|\band\s+next:?|\bપછી:?|\bબીજો\s*ગ્રાહક:?)/i;
+  const splitPattern = /(?:\b\d+[\.\)]|\bCustomer\s*\d+:?|\bનંબર\s*\d+:?|\bनंबर\s*\d+:?|\bnumber\s*\d+:?|\bnext\s*customer:?|\bagla\s*customer:?|\bnext:?|\band\s+next:?|\bપછી:?|\bબીજો\s*ગ્રાહક:?|\bअगला\s*ग्राहक:?)/i;
   
   let rawSegments = cleanSource.split(splitPattern);
 
   if (rawSegments.length <= 1) {
     const newline = String.fromCharCode(10);
-    rawSegments = cleanSource.split(new RegExp('(?:;|' + newline + '|\band\s+then\b|,)', 'i'));
+    rawSegments = cleanSource.split(new RegExp('(?:;|' + newline + '|\band\s+then\b|\baur\b|,)', 'i'));
   }
 
   const validSegments = rawSegments
@@ -220,57 +283,149 @@ export function parseBulkVoiceToExcelRecords(
   const records: BulkCustomerLoanRecord[] = [];
 
   const categoryKeywords: Record<string, string> = {
+    // Kandora
     'kandora': 'Kandora',
     'kandoro': 'Kandora',
     'કંદોરો': 'Kandora',
     'કંદોરા': 'Kandora',
+    'कंदोरा': 'Kandora',
+    'करधनी': 'Kandora',
+
+    // Kada
     'kada': 'Kada',
     'kadas': 'Kada',
     'કડા': 'Kada',
     'કડો': 'Kada',
+    'कड़ा': 'Kada',
+    'कड़े': 'Kada',
+
+    // Chain
     'chain': 'Chain',
     'ચેઇન': 'Chain',
     'દોરો': 'Chain',
+    'चेन': 'Chain',
+
+    // Ring
     'ring': 'Ring',
     'viti': 'Ring',
     'વીંટી': 'Ring',
+    'अंगूठी': 'Ring',
+    'अंगूठियां': 'Ring',
+    'मुंदरी': 'Ring',
+
+    // Necklace / Haar
     'necklace': 'Necklace',
     'haar': 'Necklace',
     'હાર': 'Necklace',
+    'हार': 'Necklace',
+
+    // Mangalsutra
     'mangalsutra': 'Mangalsutra',
     'મંગળસૂત્ર': 'Mangalsutra',
+    'मंगलसूत्र': 'Mangalsutra',
+
+    // Earrings / Jhumki
     'earring': 'Earrings',
     'earrings': 'Earrings',
     'jhumki': 'Earrings',
     'butti': 'Earrings',
     'ઝૂમખી': 'Earrings',
+    'झुमका': 'Earrings',
+    'झुमके': 'Earrings',
+    'बाली': 'Earrings',
+
+    // Bangles
     'bangle': 'Bangle',
     'bangles': 'Bangle',
     'બંગડી': 'Bangle',
+    'चूड़ी': 'Bangle',
+    'चूड़ियां': 'Bangle',
+    'कंगन': 'Bangle',
+
+    // Anklet / Payal
     'anklet': 'Anklet / Payal',
     'payal': 'Anklet / Payal',
-    'toda': 'Anklet / Payal',
     'ઝાઝર': 'Anklet / Payal',
+    'પાયલ': 'Anklet / Payal',
+    'पायल': 'Anklet / Payal',
+    'पाजेब': 'Anklet / Payal',
+    'झांझर': 'Anklet / Payal',
+
+    // Utensils
     'utensils': 'Utensils',
     'thali': 'Utensils',
     'વાસણ': 'Utensils',
+    'बर्तन': 'Utensils',
+
+    // Coin / Bar
     'coin': 'Coin / Bar',
-    'lagdi': 'Coin / Bar',
     'સિક્કો': 'Coin / Bar',
+    'सिक्का': 'Coin / Bar',
   };
 
-  validSegments.forEach((seg, index) => {
+  validSegments.forEach((seg, idx) => {
     const sLower = seg.toLowerCase();
 
-    // 1. Customer Details (Extracted cleanly)
-    const cust = parseSingleCustomerVoice(seg, knownVillages);
+    // 1. Mobile
+    let mobile: string | undefined = undefined;
+    const mMatch = seg.match(/(?:\+91|0)?[6-9]\d{9}/);
+    if (mMatch) mobile = mMatch[0];
 
-    // 2. Loan Amount (ONLY if spoken!)
+    // 2. Diary
+    let diary = 'Diary 2026';
+    const diaryMatch = seg.match(/(?:diary|ચોપડો|ડાયરી|डायरी|चोपड़ा)\s*([A-Za-z0-9\-_]+)/i);
+    if (diaryMatch) {
+      diary = diaryMatch[1].toLowerCase().startsWith('diary') ? diaryMatch[1] : `Diary ${diaryMatch[1]}`;
+    }
+
+    // 3. Page Number
+    let pageNumber = '';
+    const pageMatch = seg.match(/(?:page|p\.|પાના નંબર|પાનું|પેજ|પાન|પન્ના|पाना नंबर|पाना|पन्ना नंबर|पन्ना|पृष्ठ|पेज)\s*(?:no\.?|number|संख्या)?\s*(\d+)/i);
+    if (pageMatch) {
+      pageNumber = pageMatch[1];
+    } else {
+      const pageFallback = seg.match(/(?:page|पाना|पन्ना|પાના|p\.)\s*(\d+)/i);
+      if (pageFallback) pageNumber = pageFallback[1];
+    }
+
+    // 4. Village
+    let village = '';
+    const villagePatterns = [
+      /(?:from|resident of|village|at|gaon|gaav|se|ka|ki|ગામ|વાળા|गांव|गाँव|से|का|की)\s+([A-Za-z\u0A80-\u0AFF\u0900-\u097F]+)/i,
+      /([A-Za-z\u0A80-\u0AFF\u0900-\u097F]+)\s+(?:village|gaam|gaon|gaav|ગામ|गांव|गाँव)/i,
+    ];
+
+    for (const pat of villagePatterns) {
+      const vMatch = seg.match(pat);
+      if (vMatch && vMatch[1]) {
+        const candidate = vMatch[1].trim();
+        const ignored = [
+          'diary', 'page', 'mobile', 'phone', 'customer', 'new', 'add', 'no', 'number',
+          'loan', 'rupees', 'gold', 'silver', 'kandora', 'chandi', 'sona', 'डायरी', 'पेज', 'चांदी', 'सोना'
+        ];
+        if (!ignored.includes(candidate.toLowerCase())) {
+          village = candidate.charAt(0).toUpperCase() + candidate.slice(1);
+          break;
+        }
+      }
+    }
+
+    if (!village && knownVillages.length > 0) {
+      for (const v of knownVillages) {
+        if (sLower.includes(v.toLowerCase())) {
+          village = v;
+          break;
+        }
+      }
+    }
+    if (!village) village = 'Dahod';
+
+    // 5. Loan Amount (Supports "50000", "50 hazar", "50 हजार", "1 lakh", etc.)
     let loanAmount = 0;
     const amountMatches = [
-      /(?:loan amount|total loan|loan of|amount of|loan|રૂપિયા|રકમ|rs\.?)\s*(?:is|of|for)?\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:lakh|thousand|k|lac|rupees|rs|રૂપિયા)?/i,
-      /(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:lakh|lac|thousand|k|rupees|rs|રૂપિયા)\s*(?:loan|total|amount)?/i,
-      /(?:fifty|forty|thirty|twenty|ten|sixty|seventy|eighty|ninety|hundred|thousand|lakh|પચાસ|સાઠ|લાખ|હજાર)\s*(?:thousand|lakh|rupees|rs|રૂપિયા)?/i,
+      /(?:loan amount|total loan|loan of|amount of|loan|રૂપિયા|રકમ|रुपये|रुपए|लोन|रकम|rs\.?)\s*(?:is|of|for)?\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:lakh|thousand|hazar|k|lac|rupees|rs|રૂપિયા|रुपये)?/i,
+      /(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:lakh|lac|thousand|hazar|k|rupees|rs|રૂપિયા|रुपये|रुपए)\s*(?:loan|total|amount|लोन)?/i,
+      /(?:fifty|forty|thirty|twenty|ten|hundred|thousand|hazar|lakh|પચાસ|સાઠ|લાખ|હજાર|पचास|साठ|लाख|हजार|हज़ार)\s*(?:thousand|hazar|lakh|rupees|rs|રૂપિયા|रुपये)?/i,
     ];
 
     for (const pat of amountMatches) {
@@ -284,28 +439,55 @@ export function parseBulkVoiceToExcelRecords(
       }
     }
 
-    // 3. Ornament & Metal (ONLY if spoken!)
+    if (!loanAmount) {
+      const digitNums = seg.match(/\b\d{4,7}\b/g);
+      if (digitNums && digitNums.length > 0) {
+        loanAmount = parseInt(digitNums[0], 10);
+      } else {
+        loanAmount = 50000;
+      }
+    }
+
+    // 6. Metal Type
+    let metal: MetalType = 'Silver';
+    if (
+      sLower.includes('gold') ||
+      sLower.includes('sona') ||
+      sLower.includes('sonu') ||
+      sLower.includes('સોનું') ||
+      sLower.includes('સોના') ||
+      sLower.includes('सोना') ||
+      sLower.includes('सोने')
+    ) {
+      metal = 'Gold';
+    } else if (
+      sLower.includes('silver') ||
+      sLower.includes('chandi') ||
+      sLower.includes('ચાંદી') ||
+      sLower.includes('चांदी')
+    ) {
+      metal = 'Silver';
+    }
+
+    // 7. Weight
+    const wtMatch = seg.match(/(\d+(\.\d+)?)\s*(gram|grams|gm|gms|g|tola|tole|ગ્રામ|તોલા|ग्राम|तोला)/i);
     let weight = 0;
-    const wtMatch = seg.match(/(\d+(\.\d+)?)\s*(gram|grams|gm|gms|g|tola|tole|ગ્રામ|તોલા)/i);
     if (wtMatch) {
       weight = parseFloat(wtMatch[1]);
-      if (wtMatch[3].toLowerCase().includes('tola') || wtMatch[3].includes('તોલા')) {
+      if (
+        wtMatch[3].toLowerCase().includes('tola') ||
+        wtMatch[3].includes('તોલા') ||
+        wtMatch[3].includes('तोला')
+      ) {
         weight = weight * 11.664;
       }
       weight = Math.round(weight * 10) / 10;
+    } else {
+      weight = metal === 'Silver' ? 500 : 10;
     }
 
-    let metal: MetalType = 'Silver';
-    let metalSpecified = false;
-    if (sLower.includes('gold') || sLower.includes('sona') || sLower.includes('સોનું') || sLower.includes('સોના') || sLower.includes('સોનુ')) {
-      metal = 'Gold';
-      metalSpecified = true;
-    } else if (sLower.includes('silver') || sLower.includes('chandi') || sLower.includes('ચાંદી')) {
-      metal = 'Silver';
-      metalSpecified = true;
-    }
-
-    let category = '';
+    // 8. Ornament Category
+    let category = 'Kandora';
     for (const [kw, catName] of Object.entries(categoryKeywords)) {
       if (sLower.includes(kw)) {
         category = catName;
@@ -313,57 +495,73 @@ export function parseBulkVoiceToExcelRecords(
       }
     }
 
-    let quantity = 0;
-    if (weight > 0 || category || metalSpecified) {
-      quantity = 1;
-      if (sLower.includes('pair') || sLower.includes('બે') || sLower.includes('2')) {
-        quantity = 2;
-      }
+    // 9. Customer Name extraction
+    let cleanForName = seg;
+    if (village) {
+      cleanForName = cleanForName.replace(new RegExp(`(?:from|village|at|gaon|ગામ|गांव)?\s*${village}`, 'gi'), '');
+    }
+    if (diary) {
+      cleanForName = cleanForName.replace(new RegExp(diary, 'gi'), '');
+    }
+    if (pageNumber) {
+      cleanForName = cleanForName.replace(new RegExp(`(?:page|p\.|પાના નંબર|પાનું|पाना|पन्ना)?\s*${pageNumber}`, 'gi'), '');
+    }
+    if (mobile) {
+      cleanForName = cleanForName.replace(mobile, '');
     }
 
-    if (!cust.name && !loanAmount && !weight && !category) {
-      return;
+    cleanForName = cleanForName
+      .replace(/\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:lakh|thousand|hazar|k|lac|rupees|rs|રૂપિયા|रुपये|रुपए|loan|amount|लोन)\b/gi, '')
+      .replace(/\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:gram|grams|gm|gms|g|tola|tole|ગ્રામ|તોલા|ग्राम|तोला)\b/gi, '')
+      .replace(/\b\d+\b/g, '')
+      .replace(/\b(?:gold|silver|sona|chandi|kandora|kada|chain|ring|necklace|mangalsutra|earrings|bangle|anklet|payal|utensils|coin|સોનું|ચાંદી|કંદોરો|કડા|ચેઇન|વીંટી|હાર|મંગળસૂત્ર|सोना|चांदी|कंदोरा|कड़ा|चेन|अंगूठी|पायल|हार|झुमका)\b/gi, '')
+      .replace(/(?:customer|new customer|add customer|name is|શ્રી|નામ|नाम|श्री|श्रीमती|\bno\.?\s*\d+|thank you|thanks|from|village|diary|page|loan|rupees|રૂપિયા|रुपये)/gi, '')
+      .replace(/[^A-Za-z\u0A80-\u0AFF\u0900-\u097F\s]/g, '')
+      .trim();
+
+    const nameWords = cleanForName.split(/\s+/).filter((w) => w.length > 1);
+    let name = '';
+    if (nameWords.length > 0) {
+      name = nameWords.map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
     }
 
-    let status: 'VALID' | 'WARNING' = 'VALID';
-    let warningMessage = '';
-
-    if (!cust.name) {
-      status = 'WARNING';
-      warningMessage = 'Missing name';
+    // Default sequential page if missing
+    if (!pageNumber) {
+      pageNumber = `${idx + 1}`;
     }
 
+    const hasWarning = !name || !pageNumber;
     records.push({
-      id: `bulk-${Date.now()}-${index + 1}-${Math.random().toString(36).substring(2, 5)}`,
-      name: cust.name || `Customer ${index + 1}`,
-      village: cust.village || '',
-      diary: cust.diary || '',
-      pageNumber: cust.pageNumber || '',
-      mobile: cust.mobile || undefined,
-      loanAmount: loanAmount || 0,
-      metal: (metalSpecified || weight > 0) ? metal : ('Silver' as MetalType),
-      category: category || '',
-      weight: weight || 0,
-      quantity: quantity || 0,
+      id: `bulk-${Date.now()}-${idx + 1}`,
+      name: name || `Customer ${idx + 1}`,
+      village,
+      diary,
+      pageNumber,
+      loanAmount,
+      metal,
+      category,
+      weight,
+      quantity: 1,
+      mobile,
       rawSpeech: seg,
-      status,
-      warningMessage: warningMessage || undefined,
+      status: hasWarning ? 'WARNING' : 'VALID',
+      warningMessage: !name ? 'Spoken customer name unclear' : undefined,
     });
   });
 
   return records;
 }
 
-// 4. Loan Voice Parsing
+// 4. Single Customer Loan Voice Parsing (English & Hindi)
 export function parseLoanVoice(rawText: string, knownCategories: string[] = []): ParsedLoanVoice {
   const text = rawText.trim();
   const lower = text.toLowerCase();
 
   let loanAmount = 0;
   const amountMatches = [
-    /(?:loan amount|total loan|loan of|amount of|total|રૂપિયા|રકમ|loan)\s*(?:is|of|for)?\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:lakh|thousand|k|lac|rupees|rs|રૂપિયા)?/i,
-    /(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:lakh|lac|thousand|k|rupees|rs|રૂપિયા)\s*(?:loan|total|amount)/i,
-    /(?:fifty|forty|thirty|twenty|ten|sixty|seventy|eighty|ninety|hundred|thousand|lakh|પચાસ|સાઠ|લાખ|હજાર)\s*(?:thousand|lakh|rupees|rs|રૂપિયા)?/i,
+    /(?:loan amount|total loan|loan of|amount of|total|રૂપિયા|રકમ|रुपये|रुपए|लोन|loan)\s*(?:is|of|for)?\s*(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:lakh|thousand|hazar|k|lac|rupees|rs|રૂપિયા|रुपये)?/i,
+    /(\d+(?:,\d+)*(?:\.\d+)?)\s*(?:lakh|lac|thousand|hazar|k|rupees|rs|રૂપિયા|रुपये|रुपए)\s*(?:loan|total|amount|लोन)/i,
+    /(?:fifty|forty|thirty|twenty|ten|hundred|thousand|hazar|lakh|પચાસ|સાઠ|લાખ|હજાર|पचास|साठ|लाख|हजार|हज़ार)\s*(?:thousand|hazar|lakh|rupees|rs|રૂપિયા|रुपये)?/i,
   ];
 
   for (const pat of amountMatches) {
@@ -400,7 +598,7 @@ export function parseLoanVoice(rawText: string, knownCategories: string[] = []):
     }
   }
 
-  const ornamentSegments = text.split(/(?:\band\b|\bplus\b|\balso\b|,|અને|તથા|સાથે|और)/i);
+  const ornamentSegments = text.split(/(?:\band\b|\bplus\b|\balso\b|\baur\b|,|અને|તથા|સાથે|और)/i);
   const ornaments: { metal: MetalType; category: string; weight: number; quantity: number }[] = [];
 
   const categoryKeywords: Record<string, string> = {
@@ -408,52 +606,84 @@ export function parseLoanVoice(rawText: string, knownCategories: string[] = []):
     'kandoro': 'Kandora',
     'કંદોરો': 'Kandora',
     'કંદોરા': 'Kandora',
+    'कंदोरा': 'Kandora',
+    'करधनी': 'Kandora',
     'kada': 'Kada',
     'kadas': 'Kada',
     'કડા': 'Kada',
+    'कड़ा': 'Kada',
+    'कड़े': 'Kada',
     'chain': 'Chain',
     'ચેઇન': 'Chain',
-    'દોરો': 'Chain',
+    'ચેન': 'Chain',
+    'चेन': 'Chain',
     'ring': 'Ring',
     'viti': 'Ring',
     'વીંટી': 'Ring',
+    'अंगूठी': 'Ring',
     'necklace': 'Necklace',
     'haar': 'Necklace',
     'હાર': 'Necklace',
+    'हार': 'Necklace',
     'mangalsutra': 'Mangalsutra',
     'મંગળસૂત્ર': 'Mangalsutra',
+    'मंगलसूत्र': 'Mangalsutra',
     'earring': 'Earrings',
+    'earrings': 'Earrings',
     'jhumki': 'Earrings',
     'ઝૂમખી': 'Earrings',
+    'झुमका': 'Earrings',
+    'झुमके': 'Earrings',
     'bangle': 'Bangle',
     'બંગડી': 'Bangle',
+    'चूड़ी': 'Bangle',
     'anklet': 'Anklet / Payal',
     'payal': 'Anklet / Payal',
     'ઝાઝર': 'Anklet / Payal',
+    'पायल': 'Anklet / Payal',
     'utensils': 'Utensils',
     'thali': 'Utensils',
     'વાસણ': 'Utensils',
+    'बर्तन': 'Utensils',
     'coin': 'Coin / Bar',
     'સિક્કો': 'Coin / Bar',
+    'सिक्का': 'Coin / Bar',
   };
 
   for (const seg of ornamentSegments) {
     const sLower = seg.toLowerCase();
 
-    const wtMatch = seg.match(/(\d+(\.\d+)?)\s*(gram|grams|gm|gms|g|tola|tole|ગ્રામ|તોલા)/i);
+    const wtMatch = seg.match(/(\d+(\.\d+)?)\s*(gram|grams|gm|gms|g|tola|tole|ગ્રામ|તોલા|ग्राम|तोला)/i);
     let weight = 0;
     if (wtMatch) {
       weight = parseFloat(wtMatch[1]);
-      if (wtMatch[3].toLowerCase().includes('tola') || wtMatch[3].includes('તોલા')) {
+      if (
+        wtMatch[3].toLowerCase().includes('tola') ||
+        wtMatch[3].includes('તોલા') ||
+        wtMatch[3].includes('तोला')
+      ) {
         weight = weight * 11.664;
       }
       weight = Math.round(weight * 10) / 10;
     }
 
     let metal: MetalType = 'Silver';
-    if (sLower.includes('gold') || sLower.includes('sona') || sLower.includes('સોનું') || sLower.includes('સોના')) {
+    if (
+      sLower.includes('gold') ||
+      sLower.includes('sona') ||
+      sLower.includes('sonu') ||
+      sLower.includes('સોનું') ||
+      sLower.includes('સોના') ||
+      sLower.includes('सोना') ||
+      sLower.includes('सोने')
+    ) {
       metal = 'Gold';
-    } else if (sLower.includes('silver') || sLower.includes('chandi') || sLower.includes('ચાંદી')) {
+    } else if (
+      sLower.includes('silver') ||
+      sLower.includes('chandi') ||
+      sLower.includes('ચાંદી') ||
+      sLower.includes('चांदी')
+    ) {
       metal = 'Silver';
     } else {
       metal = weight >= 50 ? 'Silver' : 'Gold';
@@ -468,15 +698,16 @@ export function parseLoanVoice(rawText: string, knownCategories: string[] = []):
     }
 
     let quantity = 1;
-    if (sLower.includes('pair') || sLower.includes('બે') || sLower.includes('2')) {
-      quantity = 2;
+    const qtyMatch = seg.match(/(\d+)\s*(?:pcs|piece|pieces|નંગ|pieces|items|पीस)/i);
+    if (qtyMatch) {
+      quantity = parseInt(qtyMatch[1], 10);
     }
 
     if (weight > 0 || category !== 'Other') {
       ornaments.push({
         metal,
-        category: category !== 'Other' ? category : (metal === 'Silver' ? 'Kandora' : 'Chain'),
-        weight: weight || (metal === 'Silver' ? 250 : 15),
+        category: category === 'Other' ? (metal === 'Silver' ? 'Kandora' : 'Chain') : category,
+        weight: weight || (metal === 'Silver' ? 500 : 10),
         quantity,
       });
     }
@@ -484,7 +715,7 @@ export function parseLoanVoice(rawText: string, knownCategories: string[] = []):
 
   if (ornaments.length === 0) {
     ornaments.push({
-      metal: lower.includes('gold') || lower.includes('સોના') ? 'Gold' : 'Silver',
+      metal: 'Silver',
       category: 'Kandora',
       weight: 500,
       quantity: 1,

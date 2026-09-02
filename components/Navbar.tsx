@@ -17,41 +17,41 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenHistoryModal,
 }) => {
   return (
-    <header className="sticky top-0 z-40 bg-[#0d011a]/85 backdrop-blur-xl border-b border-purple-500/10 shadow-card">
+    <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-zinc-200 shadow-sm">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
-          {/* Minimal Luxury Logo */}
+        <div className="flex items-center justify-between h-16 sm:h-20">
+          {/* Logo & Store Info */}
           <div
             onClick={() => onNavigate('HOME')}
-            className="cursor-pointer flex items-center gap-3.5 group select-none"
+            className="cursor-pointer flex items-center gap-3 group select-none"
           >
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-gold-400 via-gold-500 to-purple-900 border border-gold-300/60 flex items-center justify-center text-[#0a0114] shadow-gold-glow group-hover:scale-105 transition-all duration-300">
-              <Gem className="w-6 h-6 fill-current opacity-90" />
+            <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center text-white shadow-sm group-hover:bg-purple-700 transition-colors">
+              <Gem className="w-5 h-5 fill-current" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xl font-bold tracking-tight text-white font-serif">
+                <span className="text-lg sm:text-xl font-bold tracking-tight text-zinc-900">
                   Dahod Jewellery
                 </span>
-                <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-gold-500/10 text-gold-300 border border-gold-500/20">
+                <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-100">
                   Lending
                 </span>
               </div>
-              <p className="text-xs text-purple-200/60 font-medium">
+              <p className="text-xs text-zinc-500 font-medium hidden sm:block">
                 Gold & Silver Diary Ledger
               </p>
             </div>
           </div>
 
-          {/* Google-Style Pill Navigation */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <nav className="flex items-center bg-purple-900/40 p-1.5 rounded-full border border-purple-500/15">
+          {/* Clean Pill Navigation */}
+          <div className="flex items-center gap-2">
+            <nav className="flex items-center bg-zinc-100 p-1 rounded-full border border-zinc-200/80">
               <button
                 onClick={() => onNavigate('HOME')}
-                className={`px-3.5 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 ${
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all ${
                   currentView === 'HOME'
-                    ? 'bg-gold-500 text-purple-950 shadow-gold-glow font-bold'
-                    : 'text-purple-200/70 hover:text-white hover:bg-white/5'
+                    ? 'bg-white text-purple-700 shadow-sm'
+                    : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50'
                 }`}
               >
                 <Home className="w-3.5 h-3.5" />
@@ -60,22 +60,22 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               <button
                 onClick={() => onNavigate('BULK_INPUT')}
-                className={`px-3.5 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 ${
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all ${
                   currentView === 'BULK_INPUT'
-                    ? 'bg-gold-500 text-purple-950 shadow-gold-glow font-bold'
-                    : 'text-gold-300/90 hover:text-gold-200 hover:bg-white/5'
+                    ? 'bg-white text-purple-700 shadow-sm'
+                    : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50'
                 }`}
               >
-                <Mic className="w-3.5 h-3.5" />
-                <span>Data Input (500+)</span>
+                <Mic className="w-3.5 h-3.5 text-purple-600" />
+                <span>Voice Input</span>
               </button>
 
               <button
                 onClick={() => onNavigate('CUSTOMERS')}
-                className={`px-3.5 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 ${
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all ${
                   currentView === 'CUSTOMERS'
-                    ? 'bg-gold-500 text-purple-950 shadow-gold-glow font-bold'
-                    : 'text-purple-200/70 hover:text-white hover:bg-white/5'
+                    ? 'bg-white text-purple-700 shadow-sm'
+                    : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50'
                 }`}
               >
                 <Users className="w-3.5 h-3.5" />
@@ -84,10 +84,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               <button
                 onClick={() => onNavigate('CALCULATOR')}
-                className={`px-3.5 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all duration-200 ${
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all ${
                   currentView === 'CALCULATOR'
-                    ? 'bg-gold-500 text-purple-950 shadow-gold-glow font-bold'
-                    : 'text-purple-200/70 hover:text-white hover:bg-white/5'
+                    ? 'bg-white text-purple-700 shadow-sm'
+                    : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/50'
                 }`}
               >
                 <Calculator className="w-3.5 h-3.5" />
@@ -95,13 +95,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             </nav>
 
-            <div className="h-6 w-px bg-purple-500/20 mx-1 hidden sm:block" />
+            <div className="h-5 w-px bg-zinc-200 mx-1 hidden sm:block" />
 
             {/* Utility Actions */}
             <div className="flex items-center gap-1">
               <button
                 onClick={onOpenExportModal}
-                className="p-2.5 rounded-full bg-purple-900/30 hover:bg-purple-800/50 text-gold-300 hover:text-gold-200 border border-gold-500/20 transition-all duration-200"
+                className="p-2 rounded-full text-zinc-600 hover:text-purple-700 hover:bg-purple-50 border border-zinc-200 transition-colors"
                 title="Export Excel & Backup"
               >
                 <FileSpreadsheet className="w-4 h-4" />
@@ -109,8 +109,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               <button
                 onClick={onOpenHistoryModal}
-                className="p-2.5 rounded-full bg-purple-900/30 hover:bg-purple-800/50 text-purple-200/70 hover:text-white border border-purple-500/20 transition-all duration-200"
-                title="Activity & Audit History"
+                className="p-2 rounded-full text-zinc-600 hover:text-purple-700 hover:bg-purple-50 border border-zinc-200 transition-colors"
+                title="Activity History"
               >
                 <History className="w-4 h-4" />
               </button>
