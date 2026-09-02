@@ -82,7 +82,8 @@ export function parseSpokenNumber(text: string): number | null {
     clean.includes('લાખ') ||
     clean.includes('लाख');
 
-  for (const [w, val] of Object.entries(wordsMap)) {
+  const sortedWords = Object.entries(wordsMap).sort((a, b) => b[0].length - a[0].length);
+  for (const [w, val] of sortedWords) {
     if (clean.includes(w)) {
       if (isLakh && val < 100) return val * 100000;
       if (isThousand && val < 1000) return val * 1000;
@@ -260,6 +261,7 @@ export function parseBulkVoiceToExcelRecords(
     .replace(/please subscribe\.?/gi, '')
     .replace(/tola,?\s*diary\s*page\.?/gi, '')
     .replace(/(\d+),(\d+)/g, '$1$2')
+    .replace(/\bgrand\b/gi, 'gram')
     .trim();
 
   if (!cleanSource || cleanSource.length < 2) return [];
@@ -287,6 +289,9 @@ export function parseBulkVoiceToExcelRecords(
     // Kandora
     'kandora': 'Kandora',
     'kandoro': 'Kandora',
+    'controller': 'Kandora',
+    'control': 'Kandora',
+    'kontroller': 'Kandora',
     'canedor': 'Kandora',
     'canedora': 'Kandora',
     'can draw': 'Kandora',
@@ -370,7 +375,19 @@ export function parseBulkVoiceToExcelRecords(
     'सिक्का': 'Coin / Bar',
   };
 
-  validSegments.forEach((seg, idx) => {
+  validSegments.forEach((origSeg, idx) => {
+    let seg = origSeg;
+    let initialIndex = '';
+    const matchNum = seg.match(/^(?:number\s+|item\s+)?(one|two|three|four|five|six|seven|eight|nine|ten|\d+)[\s,:\.\-]+/i);
+    if (matchNum) {
+      const numMap: Record<string, string> = {
+        one: '1', two: '2', three: '3', four: '4', five: '5',
+        six: '6', seven: '7', eight: '8', nine: '9', ten: '10'
+      };
+      initialIndex = numMap[matchNum[1].toLowerCase()] || matchNum[1];
+      seg = seg.slice(matchNum[0].length).trim();
+    }
+
     const sLower = seg.toLowerCase();
 
     // 1. Mobile
@@ -390,6 +407,8 @@ export function parseBulkVoiceToExcelRecords(
     const pageMatch = seg.match(/(?:page|p\.|પાના નંબર|પાનું|પેજ|પાન|પન્ના|पाना नंबर|पाना|पन्ना नंबर|पन्ना|पृष्ठ|पेज)\s*(?:no\.?|number|संख्या)?\s*(\d+)/i);
     if (pageMatch) {
       pageNumber = pageMatch[1];
+    } else if (initialIndex) {
+      pageNumber = initialIndex;
     } else {
       const pageFallback = seg.match(/(?:page|पाना|पन्ना|પાના|p\.)\s*(\d+)/i);
       if (pageFallback) pageNumber = pageFallback[1];
@@ -407,6 +426,7 @@ export function parseBulkVoiceToExcelRecords(
       if (vMatch && vMatch[1]) {
         const candidate = vMatch[1].trim();
         const ignored = [
+          'village', 'gaon', 'gaam', 'town', 'from', 'at',
           'diary', 'page', 'mobile', 'phone', 'customer', 'new', 'add', 'no', 'number',
           'loan', 'rupees', 'gold', 'silver', 'kandora', 'chandi', 'sona', 'डायरी', 'पेज', 'चांदी', 'सोना'
         ];
@@ -477,19 +497,37 @@ export function parseBulkVoiceToExcelRecords(
     }
 
     // 7. Weight
-    const wtMatch = seg.match(/(\d+(\.\d+)?)\s*(gram|grams|gm|gms|g|tola|tole|ગ્રામ|તોલા|ग्राम|तोला)/i);
+    const wtMatch = seg.match(/(\d+(?:\.\d+)?)\s*(gram|grams|gm|gms|g|tola|tole|ગ્રામ|તોલા|ग्राम|तोला|grand)/i);
     let weight = 0;
     if (wtMatch) {
       weight = parseFloat(wtMatch[1]);
       if (
-        wtMatch[3].toLowerCase().includes('tola') ||
-        wtMatch[3].includes('તોલા') ||
-        wtMatch[3].includes('तोला')
+        wtMatch[2].toLowerCase().includes('tola') ||
+        wtMatch[2].includes('તોલા') ||
+        wtMatch[2].includes('तोला')
       ) {
         weight = weight * 11.664;
       }
       weight = Math.round(weight * 10) / 10;
     } else {
+      const wordWeights: Record<string, number> = {
+        'five hundred': 500, 'four hundred': 400, 'three hundred': 300, 'two hundred': 200, 'one hundred': 100,
+        'panch sau': 500, 'char sau': 400, 'tran sau': 300, 'be sau': 200, 'ek sau': 100,
+        'पांच सौ': 500, 'चार सौ': 400, 'तीन सौ': 300, 'दो सौ': 200, 'एक सौ': 100,
+        'પાંચસો': 500, 'ચારસો': 400, 'ત્રણસો': 300, 'બસો': 200, 'સો': 100,
+        'fifty': 50, 'pachas': 50, 'पचास': 50, 'પચાસ': 50,
+        'twenty': 20, 'bees': 20, 'બીસ': 20, 'बीस': 20,
+        'ten': 10, 'dus': 10, 'દસ': 10, 'दस': 10,
+        'hundred': 100, 'sau': 100, 'सौ': 100,
+      };
+      for (const [wKey, val] of Object.entries(wordWeights)) {
+        if (sLower.includes(wKey)) {
+          weight = val;
+          break;
+        }
+      }
+    }
+    if (!weight) {
       weight = metal === 'Silver' ? 500 : 10;
     }
 
@@ -518,10 +556,10 @@ export function parseBulkVoiceToExcelRecords(
     }
 
     cleanForName = cleanForName
-      .replace(/\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:lakh|thousand|hazar|k|lac|rupees|rs|રૂપિયા|रुपये|रुपए|loan|amount|लोन)\b/gi, '')
-      .replace(/\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:gram|grams|gm|gms|g|tola|tole|ગ્રામ|તોલા|ग्राम|तोला)\b/gi, '')
+      .replace(/\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:lakh|thousand|hazar|k|lac|rupees|rs|રૂપિયા|રકમ|रुपये|रुपए|loan|amount|लोन)\b/gi, '')
+      .replace(/(?:(?:one|two|three|four|five|six|seven|eight|nine|ten|twenty|fifty|hundred|two hundred|three hundred|four hundred|five hundred|pachas|sau|be sau|tran sau|char sau|panch sau|dosau|teensau|\d+)\s*)+(?:gram|grams|gm|gms|g|grand|tola|tole|ગ્રામ|તોલા|ग्राम|तोला)/gi, '')
       .replace(/\b\d+\b/g, '')
-      .replace(/\b(?:gold|silver|sona|chandi|kandora|kandoro|canedor|canedora|can draw|can dora|can do ra|kandoora|kada|chain|ring|necklace|mangalsutra|earrings|bangle|anklet|payal|utensils|coin|સોનું|ચાંદી|કંદોરો|કડા|ચેઇન|વીંટી|હાર|મંગળસૂત્ર|सोना|चांदी|कंदोरा|कड़ा|चेन|अंगूठी|पायल|हार|झुमका)\b/gi, '')
+      .replace(/\b(?:gold|silver|sona|chandi|kandora|kandoro|controller|control|kontroller|canedor|canedora|can draw|can dora|can do ra|kandoora|kada|chain|ring|necklace|mangalsutra|earrings|bangle|anklet|payal|utensils|coin|સોનું|ચાંદી|કંદોરો|કડા|ચેઇન|વીંટી|હાર|મંગળસૂત્ર|सोना|चांदी|कंदोरा|कड़ा|चेन|अंगूठी|पायल|हार|झुमका)\b/gi, '')
       .replace(/(?:customer|new customer|add customer|name is|શ્રી|નામ|नाम|श्री|श्रीमती|\bno\.?\s*\d+|thank you|thanks|from|village|diary|page|loan|rupees|રૂપિયા|રકમ|रुपये)/gi, '')
       .replace(/[^A-Za-z\u0A80-\u0AFF\u0900-\u097F\s]/g, '')
       .trim();

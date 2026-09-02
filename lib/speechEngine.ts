@@ -85,20 +85,25 @@ export function resampleTo16k(audioBuffer: Float32Array, inputSampleRate: number
 // Sanitize transcript text
 export function sanitizeTranscript(text: string): string {
   if (!text) return '';
-  return text
-    .replace(/thank you for watching\.?/gi, '')
-    .replace(/thanks for watching\.?/gi, '')
-    .replace(/please subscribe\.?/gi, '')
-    .replace(/subtitles by.*$/gi, '')
-    .replace(/translated by.*$/gi, '')
-    .replace(/amara\.org/gi, '')
-    .replace(/watching!/gi, '')
-    .replace(/\[music\]/gi, '')
-    .replace(/\(music\)/gi, '')
-    .replace(/\[silence\]/gi, '')
-    .replace(/\[applause\]/gi, '')
-    .replace(/\(silence\)/gi, '')
-    .trim();
+  let cleaned = text;
+
+  // 1. Remove bracketed / parenthetical sound effects (e.g. audience chattering, music)
+  cleaned = cleaned.replace(/[\(\[][^\)\]]*(?:chatter|audience|applause|music|silence|whisper|laughter|noise|bell|beep)[^\)\]]*[\)\]]/gi, '');
+
+  // 2. Remove common Whisper hallucination and loop trigger phrases
+  cleaned = cleaned.replace(/(?:fif|if you have) (?:a )?question.*$/gi, '');
+  cleaned = cleaned.replace(/thank you for watching\.?/gi, '');
+  cleaned = cleaned.replace(/thanks for watching\.?/gi, '');
+  cleaned = cleaned.replace(/please subscribe\.?/gi, '');
+  cleaned = cleaned.replace(/subtitles by.*$/gi, '');
+  cleaned = cleaned.replace(/translated by.*$/gi, '');
+  cleaned = cleaned.replace(/amara\.org/gi, '');
+  cleaned = cleaned.replace(/watching!/gi, '');
+
+  // 3. Collapse repetitive loop phrases
+  cleaned = cleaned.replace(/(.{4,60}?)(?:\s*\1\s*){2,}/gi, '$1');
+
+  return cleaned.trim();
 }
 
 /**
@@ -431,6 +436,14 @@ export class CustomHybridSpeechEngine {
     this.callbacks.onEnd?.();
 
     const fallbackStreamText = this.liveRealtimeText.trim();
+
+    // 1. If live stream already captured words verified live by the user, return it directly!
+    // Never overwrite what the user saw and verified with model hallucinations.
+    if (fallbackStreamText && fallbackStreamText.length >= 2) {
+      this.callbacks.onFinalResult?.(fallbackStreamText);
+      return fallbackStreamText;
+    }
+
     const keyToUse =
       apiKey ||
       (typeof window !== 'undefined'

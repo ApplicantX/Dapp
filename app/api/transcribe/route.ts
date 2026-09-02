@@ -16,7 +16,15 @@ export async function GET() {
 // Filter out known hallucination strings
 function cleanWhisperTranscript(text: string): string {
   if (!text) return '';
+
+  let cleaned = text;
+
+  // 1. Remove bracketed / parenthetical sound effects (e.g. audience chattering, music)
+  cleaned = cleaned.replace(/[\(\[][^\)\]]*(?:chatter|audience|applause|music|silence|whisper|laughter|noise|bell|beep)[^\)\]]*[\)\]]/gi, '');
+
+  // 2. Remove common Whisper hallucination and loop trigger phrases
   const hallucinations = [
+    /(?:fif|if you have) (?:a )?question.*$/gi,
     /thank you for watching\.?/gi,
     /thanks for watching\.?/gi,
     /please subscribe\.?/gi,
@@ -29,12 +37,18 @@ function cleanWhisperTranscript(text: string): string {
     /\[silence\]/gi,
     /\[applause\]/gi,
     /\(silence\)/gi,
+    /\[beep\]/gi,
+    /\(beep\)/gi,
   ];
 
-  let cleaned = text;
   hallucinations.forEach((h) => {
     cleaned = cleaned.replace(h, '');
   });
+
+  // 3. Collapse repetitive token loops
+  cleaned = cleaned.replace(/\b(\w+)(?:\s+\1\b){3,}/gi, '$1');
+  cleaned = cleaned.replace(/(.{4,60}?)(?:\s*\1\s*){2,}/gi, '$1');
+
   return cleaned.trim();
 }
 

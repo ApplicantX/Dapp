@@ -160,6 +160,8 @@ function cleanWhisperTranscript(text) {
 
   // 2. Filter out known hallucination phrases
   const hallucinations = [
+    /[\(\[][^\)\]]*(?:chatter|audience|applause|music|silence|whisper|laughter|noise|bell|beep)[^\)\]]*[\)\]]/gi,
+    /(?:fif|if you have) (?:a )?question.*$/gi,
     /thank you for watching\.?/gi,
     /thanks for watching\.?/gi,
     /please subscribe\.?/gi,
@@ -181,8 +183,9 @@ function cleanWhisperTranscript(text) {
     cleaned = cleaned.replace(h, '');
   });
 
-  // 3. Detect and collapse repetitive token loops (e.g. "kandora kandora kandora...")
+  // 3. Detect and collapse repetitive token loops (e.g. "kandora kandora kandora..." or phrase loops)
   cleaned = cleaned.replace(/\b(\w+)(?:\s+\1\b){3,}/gi, '$1');
+  cleaned = cleaned.replace(/(.{4,60}?)(?:\s*\1\s*){2,}/gi, '$1');
   // Collapse character repetition loops
   cleaned = cleaned.replace(/(.{2,10}?)\1{3,}/gu, '$1');
 
