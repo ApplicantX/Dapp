@@ -259,17 +259,18 @@ export function parseBulkVoiceToExcelRecords(
     .replace(/thanks\.?/gi, '')
     .replace(/please subscribe\.?/gi, '')
     .replace(/tola,?\s*diary\s*page\.?/gi, '')
+    .replace(/(\d+),(\d+)/g, '$1$2')
     .trim();
 
   if (!cleanSource || cleanSource.length < 2) return [];
 
-  const splitPattern = /(?:\b\d+[\.\)]|\bCustomer\s*\d+:?|\bનંબર\s*\d+:?|\bनंबर\s*\d+:?|\bnumber\s*\d+:?|\bnext\s*customer:?|\bagla\s*customer:?|\bnext:?|\band\s+next:?|\bપછી:?|\bબીજો\s*ગ્રાહક:?|\bअगला\s*ग्राहक:?)/i;
+  const splitPattern = /(?:(?:^|\s)\d+[\.\)]|\bCustomer\s*\d+:?|\bનંબર\s*\d+:?|\bनंबर\s*\d+:?|\bnumber\s*\d+:?|\bnext\s*customer:?|\bagla\s*customer:?|\bnext:?|\band\s+next:?|\bપછી:?|\bબીજો\s*ગ્રાહક:?|\bअगला\s*ग्राहक:?)/i;
   
   let rawSegments = cleanSource.split(splitPattern);
 
   if (rawSegments.length <= 1) {
     const newline = String.fromCharCode(10);
-    rawSegments = cleanSource.split(new RegExp('(?:;|' + newline + '|\band\s+then\b|\baur\b|,)', 'i'));
+    rawSegments = cleanSource.split(new RegExp('(?:;|' + newline + '|\band\s+then\s+next\b|\baur\s+agla\b)', 'i'));
   }
 
   const validSegments = rawSegments
@@ -286,6 +287,12 @@ export function parseBulkVoiceToExcelRecords(
     // Kandora
     'kandora': 'Kandora',
     'kandoro': 'Kandora',
+    'canedor': 'Kandora',
+    'canedora': 'Kandora',
+    'can draw': 'Kandora',
+    'can dora': 'Kandora',
+    'can do ra': 'Kandora',
+    'kandoora': 'Kandora',
     'કંદોરો': 'Kandora',
     'કંદોરા': 'Kandora',
     'कंदोरा': 'Kandora',
@@ -514,8 +521,8 @@ export function parseBulkVoiceToExcelRecords(
       .replace(/\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:lakh|thousand|hazar|k|lac|rupees|rs|રૂપિયા|रुपये|रुपए|loan|amount|लोन)\b/gi, '')
       .replace(/\b\d+(?:,\d+)*(?:\.\d+)?\s*(?:gram|grams|gm|gms|g|tola|tole|ગ્રામ|તોલા|ग्राम|तोला)\b/gi, '')
       .replace(/\b\d+\b/g, '')
-      .replace(/\b(?:gold|silver|sona|chandi|kandora|kada|chain|ring|necklace|mangalsutra|earrings|bangle|anklet|payal|utensils|coin|સોનું|ચાંદી|કંદોરો|કડા|ચેઇન|વીંટી|હાર|મંગળસૂત્ર|सोना|चांदी|कंदोरा|कड़ा|चेन|अंगूठी|पायल|हार|झुमका)\b/gi, '')
-      .replace(/(?:customer|new customer|add customer|name is|શ્રી|નામ|नाम|श्री|श्रीमती|\bno\.?\s*\d+|thank you|thanks|from|village|diary|page|loan|rupees|રૂપિયા|रुपये)/gi, '')
+      .replace(/\b(?:gold|silver|sona|chandi|kandora|kandoro|canedor|canedora|can draw|can dora|can do ra|kandoora|kada|chain|ring|necklace|mangalsutra|earrings|bangle|anklet|payal|utensils|coin|સોનું|ચાંદી|કંદોરો|કડા|ચેઇન|વીંટી|હાર|મંગળસૂત્ર|सोना|चांदी|कंदोरा|कड़ा|चेन|अंगूठी|पायल|हार|झुमका)\b/gi, '')
+      .replace(/(?:customer|new customer|add customer|name is|શ્રી|નામ|नाम|श्री|श्रीमती|\bno\.?\s*\d+|thank you|thanks|from|village|diary|page|loan|rupees|રૂપિયા|રકમ|रुपये)/gi, '')
       .replace(/[^A-Za-z\u0A80-\u0AFF\u0900-\u097F\s]/g, '')
       .trim();
 
