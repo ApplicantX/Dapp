@@ -2,16 +2,20 @@
 
 import React, { useState, useEffect } from 'react';
 import { AppData, Customer, Loan, Ornament } from '@/lib/types';
-import {
-  getStoredData,
-  resetToSampleData,
-  addCustomer,
-  addBatchCustomers,
-  updateCustomer,
-  addLoan,
-  closeLoan,
-} from '@/lib/storage';
+import { getLoanPrincipalDetails } from '@/lib/storage';
 import { initialAppData } from '@/lib/sampleData';
+import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
+import {
+  fetchDatabase,
+  dbAddCustomer,
+  dbUpdateCustomer,
+  dbAddLoan,
+  dbCloseLoan,
+  dbAddPayment,
+  dbDeletePayment,
+  dbAddTopUp,
+  dbDeleteTopUp,
+} from '@/lib/db';
 import { Navbar } from '@/components/Navbar';
 import { CustomerList } from '@/components/CustomerList';
 import { CustomerDetailView } from '@/components/CustomerDetailView';
@@ -29,10 +33,14 @@ import {
   ArrowRight,
   Sparkles,
   Mic,
+  AlertTriangle,
 } from 'lucide-react';
 
 export default function HomePage() {
   const [data, setData] = useState<AppData>(initialAppData);
+  const [isLoading, setIsLoading] = useState(true);
+  const [dbError, setDbError] = useState<string | null>(null);
+  const [isCloudConnected, setIsCloudConnected] = useState(false);
 
   // Navigation State
   const [currentView, setCurrentView] = useState<'HOME' | 'CUSTOMERS' | 'CALCULATOR' | 'BULK_INPUT'>('HOME');
@@ -45,62 +53,291 @@ export default function HomePage() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
+  // 1. Direct Load from Supabase on Mount (ZERO local storage usage)
   useEffect(() => {
-    try {
-      const stored = getStoredData();
-      if (stored) {
-        setData(stored);
+    let subscription: any = null;
+
+    const initLiveDatabase = async () => {
+      setIsLoading(true);
+      setDbError(null);
+      try {
+        if (!isSupabaseConfigured()) {
+          throw new Error('Supabase configuration missing in .env.local');
+        }
+        setIsCloudConnected(true);
+        const liveData = await fetchDatabase();
+        setData(liveData);
+
+        // Subscribe to Supabase Realtime so changes made on ANY tab or device update immediately
+        if (supabase) {
+          subscription = supabase
+            .channel('supabase-live-ledger')
+            .on('postgres_changes', { event: '*', schema: 'public' }, async () => {
+              console.log('Realtime change from Supabase detected!');
+              try {
+                const refreshed = await fetchDatabase();
+                setData(refreshed);
+              } catch (e) {
+                console.error('Failed to refetch after realtime event:', e);
+              }
+            })
+            .subscribe();
+        }
+      } catch (err: any) {
+        console.error('Supabase Connection Failed:', err);
+        setDbError(err?.message || 'Failed to connect to Supabase.');
+      } finally {
+        setIsLoading(false);
       }
-    } catch (err) {
-      console.warn('Failed to load stored data:', err);
-    }
+    };
+
+    initLiveDatabase();
+
+    return () => {
+      if (subscription && supabase) {
+        supabase.removeChannel(subscription);
+      }
+    };
   }, []);
 
-  const refreshData = () => {
-    setData(getStoredData());
-  };
-
-  // Customer Actions
-  const handleSaveCustomer = (newCust: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const res = addCustomer(data, newCust);
-    setData(res.data);
-    setSelectedCustomer(res.newCustomer);
-    setCurrentView('CUSTOMERS');
-  };
-
-  const handleSaveBatchCustomers = (custList: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>[]) => {
-    const updated = addBatchCustomers(data, custList);
-    setData(updated);
-    setCurrentView('CUSTOMERS');
-  };
-
-  const handleSaveDiaryPage = (customerId: string, newDiary: string, newPageNumber: string) => {
-    const updated = updateCustomer(data, customerId, {
-      diary: newDiary,
-      pageNumber: newPageNumber,
-    });
-    setData(updated);
-    if (selectedCustomer && selectedCustomer.id === customerId) {
-      setSelectedCustomer({
-        ...selectedCustomer,
-        diary: newDiary,
-        pageNumber: newPageNumber,
-      });
+  const refreshData = async () => {
+    try {
+      const refreshed = await fetchDatabase();
+      setData(refreshed);
+    } catch (e) {
+      console.error('Failed to refresh data from Supabase:', e);
     }
   };
 
-  // Loan Actions
-  const handleSaveLoan = (
+  // Customer Actions (DIRECT SUPABASE MUTATIONS)
+  const handleSaveCustomer = async (newCust: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      const created = await dbAddCustomer(newCust);
+      setData((prev) => ({
+        ...prev,
+        customers: [created, ...prev.customers],
+        villages: prev.villages.includes(created.village) ? prev.villages : [...prev.villages, created.village],
+        diaries: prev.diaries.includes(created.diary) ? prev.diaries : [...prev.diaries, created.diary],
+      }));
+      setSelectedCustomer(created);
+      setCurrentView('CUSTOMERS');
+    } catch (err: any) {
+      console.error('Failed to save customer:', err);
+      alert(`CRITICAL ERROR: Failed to save customer to Supabase!\n\n${err?.message || err}`);
+    }
+  };
+
+  const handleSaveBatchCustomers = async (custList: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>[]) => {
+    try {
+      for (const c of custList) {
+        await dbAddCustomer(c);
+      }
+      const refreshed = await fetchDatabase();
+      setData(refreshed);
+      setCurrentView('CUSTOMERS');
+    } catch (err: any) {
+      console.error('Failed to save batch customers:', err);
+      alert(`CRITICAL ERROR: Failed to save customers to Supabase!\n\n${err?.message || err}`);
+    }
+  };
+
+  const handleSaveDiaryPage = async (customerId: string, newDiary: string, newPageNumber: string) => {
+    try {
+      const existing = data.customers.find((c) => c.id === customerId);
+      if (!existing) return;
+
+      const updated = await dbUpdateCustomer(
+        customerId,
+        { diary: newDiary, pageNumber: newPageNumber },
+        existing
+      );
+
+      setData((prev) => ({
+        ...prev,
+        customers: prev.customers.map((c) => (c.id === customerId ? updated : c)),
+        diaries: prev.diaries.includes(newDiary) ? prev.diaries : [...prev.diaries, newDiary],
+      }));
+
+      if (selectedCustomer && selectedCustomer.id === customerId) {
+        setSelectedCustomer(updated);
+      }
+    } catch (err: any) {
+      console.error('Failed to update diary page:', err);
+      alert(`CRITICAL ERROR: Failed to update diary page in Supabase!\n\n${err?.message || err}`);
+    }
+  };
+
+  // Loan Actions (DIRECT SUPABASE MUTATIONS)
+  const handleSaveLoan = async (
     customerId: string,
     loanData: { loanDate: string; loanAmount: number; ornaments: Ornament[]; notes?: string }
   ) => {
-    const updated = addLoan(data, customerId, loanData);
-    setData(updated);
+    try {
+      const customer = data.customers.find((c) => c.id === customerId);
+      const newLoan = await dbAddLoan(
+        customerId,
+        loanData,
+        customer ? customer.name : 'Customer',
+        customer ? customer.village : 'Dahod'
+      );
+
+      setData((prev) => ({
+        ...prev,
+        loans: [newLoan, ...prev.loans],
+      }));
+    } catch (err: any) {
+      console.error('Failed to save loan:', err);
+      alert(`CRITICAL ERROR: Failed to save loan to Supabase!\n\n${err?.message || err}`);
+    }
   };
 
-  const handleCloseLoan = (loanId: string) => {
-    const updated = closeLoan(data, loanId);
-    setData(updated);
+  const handleCloseLoan = async (loanId: string) => {
+    try {
+      const targetLoan = data.loans.find((l) => l.id === loanId);
+      const customer = data.customers.find((c) => c.id === targetLoan?.customerId);
+      const ornamentSummary = (targetLoan?.ornaments || [])
+        .map((o) => `${o.quantity}x ${o.weight}g ${o.metal} ${o.category}`)
+        .join(', ');
+
+      const closedDate = await dbCloseLoan(
+        loanId,
+        customer ? customer.name : 'Customer',
+        customer ? customer.village : 'Dahod',
+        ornamentSummary,
+        targetLoan ? targetLoan.loanAmount : 0
+      );
+
+      setData((prev) => ({
+        ...prev,
+        loans: prev.loans.map((l) =>
+          l.id === loanId ? { ...l, status: 'CLOSED', closedDate } : l
+        ),
+      }));
+    } catch (err: any) {
+      console.error('Failed to close loan:', err);
+      alert(`CRITICAL ERROR: Failed to close loan in Supabase!\n\n${err?.message || err}`);
+    }
+  };
+
+  const handleAddPayment = async (
+    loanId: string,
+    paymentData: { date: string; amount: number; interestAmount?: number; notes?: string }
+  ) => {
+    try {
+      const targetLoan = data.loans.find((l) => l.id === loanId);
+      const customer = data.customers.find((c) => c.id === targetLoan?.customerId);
+      const details = targetLoan ? getLoanPrincipalDetails(targetLoan) : { remainingPrincipal: 0 };
+
+      const newPayment = await dbAddPayment(
+        loanId,
+        paymentData,
+        customer ? customer.name : 'Customer',
+        customer ? customer.village : 'Dahod',
+        details.remainingPrincipal
+      );
+
+      setData((prev) => ({
+        ...prev,
+        loans: prev.loans.map((l) =>
+          l.id === loanId
+            ? { ...l, payments: [...(l.payments || []), newPayment], updatedAt: new Date().toISOString() }
+            : l
+        ),
+      }));
+    } catch (err: any) {
+      console.error('Failed to save repayment:', err);
+      alert(`CRITICAL ERROR: Failed to record payment in Supabase!\n\n${err?.message || err}`);
+    }
+  };
+
+  const handleDeletePayment = async (loanId: string, paymentId: string) => {
+    try {
+      const targetLoan = data.loans.find((l) => l.id === loanId);
+      const customer = data.customers.find((c) => c.id === targetLoan?.customerId);
+      const targetPayment = (targetLoan?.payments || []).find((p) => p.id === paymentId);
+
+      await dbDeletePayment(
+        paymentId,
+        customer ? customer.name : 'Customer',
+        customer ? customer.village : 'Dahod',
+        targetPayment?.amount || 0,
+        targetPayment?.date || ''
+      );
+
+      setData((prev) => ({
+        ...prev,
+        loans: prev.loans.map((l) =>
+          l.id === loanId
+            ? { ...l, payments: (l.payments || []).filter((p) => p.id !== paymentId), updatedAt: new Date().toISOString() }
+            : l
+        ),
+      }));
+    } catch (err: any) {
+      console.error('Failed to delete repayment:', err);
+      alert(`CRITICAL ERROR: Failed to delete payment from Supabase!\n\n${err?.message || err}`);
+    }
+  };
+
+  const handleAddTopUp = async (
+    loanId: string,
+    topUpData: { date: string; amount: number; notes?: string }
+  ) => {
+    try {
+      const targetLoan = data.loans.find((l) => l.id === loanId);
+      const customer = data.customers.find((c) => c.id === targetLoan?.customerId);
+      const details = targetLoan ? getLoanPrincipalDetails(targetLoan) : { totalBorrowed: 0, remainingPrincipal: 0 };
+      const newTotal = details.totalBorrowed + (Number(topUpData.amount) || 0);
+      const newRem = details.remainingPrincipal + (Number(topUpData.amount) || 0);
+
+      const newTopUp = await dbAddTopUp(
+        loanId,
+        topUpData,
+        customer ? customer.name : 'Customer',
+        customer ? customer.village : 'Dahod',
+        newTotal,
+        newRem
+      );
+
+      setData((prev) => ({
+        ...prev,
+        loans: prev.loans.map((l) =>
+          l.id === loanId
+            ? { ...l, topUps: [...(l.topUps || []), newTopUp], updatedAt: new Date().toISOString() }
+            : l
+        ),
+      }));
+    } catch (err: any) {
+      console.error('Failed to save top-up:', err);
+      alert(`CRITICAL ERROR: Failed to record top-up in Supabase!\n\n${err?.message || err}`);
+    }
+  };
+
+  const handleDeleteTopUp = async (loanId: string, topUpId: string) => {
+    try {
+      const targetLoan = data.loans.find((l) => l.id === loanId);
+      const customer = data.customers.find((c) => c.id === targetLoan?.customerId);
+      const targetTopUp = (targetLoan?.topUps || []).find((t) => t.id === topUpId);
+
+      await dbDeleteTopUp(
+        topUpId,
+        customer ? customer.name : 'Customer',
+        customer ? customer.village : 'Dahod',
+        targetTopUp?.amount || 0,
+        targetTopUp?.date || ''
+      );
+
+      setData((prev) => ({
+        ...prev,
+        loans: prev.loans.map((l) =>
+          l.id === loanId
+            ? { ...l, topUps: (l.topUps || []).filter((t) => t.id !== topUpId), updatedAt: new Date().toISOString() }
+            : l
+        ),
+      }));
+    } catch (err: any) {
+      console.error('Failed to delete top-up:', err);
+      alert(`CRITICAL ERROR: Failed to delete top-up from Supabase!\n\n${err?.message || err}`);
+    }
   };
 
   // Active Loan & Vault Calculations
@@ -110,13 +347,45 @@ export default function HomePage() {
   let totalActiveSilverGrams = 0;
 
   activeLoans.forEach((l) => {
-    totalActivePrincipal += Number(l.loanAmount) || 0;
+    const { remainingPrincipal } = getLoanPrincipalDetails(l);
+    totalActivePrincipal += remainingPrincipal;
     (l.ornaments || []).forEach((o) => {
       if (!o) return;
       if (o.metal === 'Gold') totalActiveGoldGrams += Number(o.weight) || 0;
       else totalActiveSilverGrams += Number(o.weight) || 0;
     });
   });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#fafafa]">
+        <div className="p-8 sm:p-10 bg-white rounded-3xl border-2 border-purple-200 shadow-md flex items-center gap-4 text-center">
+          <div className="w-8 h-8 rounded-full border-4 border-purple-200 border-t-purple-600 animate-spin flex-shrink-0" />
+          <span className="text-lg font-bold text-zinc-800">
+            Connecting to Live Supabase Database... (ડેટાબેઝ લોડ થઈ રહ્યો છે)
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (dbError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#fafafa] p-4">
+        <div className="p-8 bg-rose-50 rounded-3xl border-2 border-rose-300 shadow-md text-center max-w-md space-y-4">
+          <AlertTriangle className="w-10 h-10 text-rose-600 mx-auto" />
+          <h2 className="text-xl font-bold text-rose-900">Database Connection Failed</h2>
+          <p className="text-xs text-rose-700">{dbError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-2.5 rounded-full bg-rose-600 text-white font-bold text-xs"
+          >
+            Retry Connection (ફરીથી પ્રયાસ કરો)
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fafafa] text-zinc-900">
@@ -129,6 +398,7 @@ export default function HomePage() {
         }}
         onOpenExportModal={() => setIsExportModalOpen(true)}
         onOpenHistoryModal={() => setIsHistoryModalOpen(true)}
+        isCloudConnected={isCloudConnected}
       />
 
       {/* Main Content Area */}
@@ -296,6 +566,11 @@ export default function HomePage() {
                 onOpenNewLoanModal={() => setIsNewLoanOpen(true)}
                 onCloseLoan={handleCloseLoan}
                 onEditDiaryPage={() => setIsEditDiaryPageOpen(true)}
+                onAddPayment={handleAddPayment}
+                onDeletePayment={handleDeletePayment}
+                onAddTopUp={handleAddTopUp}
+                onDeleteTopUp={handleDeleteTopUp}
+                defaultRate={data.defaultAnnualInterestRate || 18.0}
               />
             ) : (
               <CustomerList

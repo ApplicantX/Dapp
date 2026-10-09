@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { Customer, Loan } from '@/lib/types';
+import { getLoanPrincipalDetails } from '@/lib/storage';
 import { CustomDirectAudioEngine } from '@/lib/speechEngine';
 import {
   Search,
@@ -250,7 +251,8 @@ export const CustomerList: React.FC<CustomerListProps> = ({
               let activeLoanTotal = 0;
 
               activeLoans.forEach((l) => {
-                activeLoanTotal += Number(l.loanAmount) || 0;
+                const { remainingPrincipal } = getLoanPrincipalDetails(l);
+                activeLoanTotal += remainingPrincipal;
                 (l.ornaments || []).forEach((o) => {
                   if (!o) return;
                   if (o.metal === 'Gold') activeGoldGrams += Number(o.weight) || 0;

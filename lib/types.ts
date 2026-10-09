@@ -11,13 +11,33 @@ export interface Ornament {
   description?: string;
 }
 
+export interface LoanPayment {
+  id: string;
+  date: string; // YYYY-MM-DD
+  amount: number; // Total amount paid in INR
+  interestAmount?: number; // Interest portion considered (વ્યાજ પેટે)
+  principalAmount?: number; // Principal reduction portion (મુદ્દલ પેટે)
+  notes?: string;
+  createdAt: string;
+}
+
+export interface LoanTopUp {
+  id: string;
+  date: string; // YYYY-MM-DD
+  amount: number; // Additional loan amount in INR (વધારાનો ઉપાડ)
+  notes?: string;
+  createdAt: string;
+}
+
 export interface Loan {
   id: string;
   customerId: string;
   loanDate: string; // YYYY-MM-DD
-  loanAmount: number; // Principal in INR
+  loanAmount: number; // Initial Principal in INR
   status: LoanStatus;
   ornaments: Ornament[];
+  payments?: LoanPayment[]; // Partial repayments made by customer
+  topUps?: LoanTopUp[]; // Additional loan amounts taken on same jewelry (વધારાનો ઉપાડ)
   closedDate?: string;
   notes?: string;
   createdAt: string;
@@ -39,7 +59,7 @@ export interface ActivityLog {
   id: string;
   timestamp: string;
   user: string;
-  action: 'CREATE_CUSTOMER' | 'EDIT_CUSTOMER' | 'ADD_LOAN' | 'EDIT_LOAN' | 'CLOSE_LOAN' | 'DELETE_LOAN' | 'MOVE_DIARY_PAGE' | 'BULK_IMPORT' | 'AUTH_LOGIN' | 'REVOKE_DEVICE';
+  action: 'CREATE_CUSTOMER' | 'EDIT_CUSTOMER' | 'ADD_LOAN' | 'EDIT_LOAN' | 'CLOSE_LOAN' | 'DELETE_LOAN' | 'MOVE_DIARY_PAGE' | 'BULK_IMPORT' | 'AUTH_LOGIN' | 'REVOKE_DEVICE' | 'ADD_PAYMENT' | 'DELETE_PAYMENT' | 'ADD_TOPUP' | 'DELETE_TOPUP';
   customerName: string;
   village: string;
   details: string;

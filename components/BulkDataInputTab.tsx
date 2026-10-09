@@ -4,7 +4,8 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { AppData, BulkCustomerLoanRecord } from '@/lib/types';
 import { CustomHybridSpeechEngine } from '@/lib/speechEngine';
 import { parseBulkVoiceToExcelRecords } from '@/lib/voiceParser';
-import { exportBulkRecordsToExcel, commitBulkRecordsToDatabase } from '@/lib/storage';
+import { exportBulkRecordsToExcel } from '@/lib/storage';
+import { dbCommitBulkRecords, fetchDatabase } from '@/lib/db';
 import {
   Mic,
   MicOff,
@@ -221,16 +222,22 @@ export const BulkDataInputTab: React.FC<BulkDataInputTabProps> = ({
   };
 
   // Commit All to App Database
-  const handleCommitToDatabase = () => {
+  const handleCommitToDatabase = async () => {
     if (records.length === 0) return;
     const confirmCommit = window.confirm(
-      `Commit all ${records.length} customer records and their loans directly to the app database?`
+      `Commit all ${records.length} customer records and their loans directly to the Supabase database?`
     );
     if (confirmCommit) {
-      const updated = commitBulkRecordsToDatabase(appData, records);
-      onCommitSuccess(updated);
-      setCommittedCount(records.length);
-      setTimeout(() => setCommittedCount(null), 4000);
+      try {
+        await dbCommitBulkRecords(records);
+        const live = await fetchDatabase();
+        onCommitSuccess(live);
+        setCommittedCount(records.length);
+        setTimeout(() => setCommittedCount(null), 4000);
+      } catch (err: any) {
+        console.error('Bulk commit error:', err);
+        alert(`Failed to commit records to Supabase: ${err?.message || err}`);
+      }
     }
   };
 

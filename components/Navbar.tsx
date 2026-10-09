@@ -8,6 +8,7 @@ interface NavbarProps {
   onNavigate: (view: 'HOME' | 'CUSTOMERS' | 'CALCULATOR' | 'BULK_INPUT') => void;
   onOpenExportModal: () => void;
   onOpenHistoryModal: () => void;
+  isCloudConnected?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -15,6 +16,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onNavigate,
   onOpenExportModal,
   onOpenHistoryModal,
+  isCloudConnected = false,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-zinc-200 shadow-sm">
@@ -36,6 +38,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-100">
                   Lending
                 </span>
+                {isCloudConnected && (
+                  <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Supabase Live</span>
+                  </span>
+                )}
               </div>
               <p className="text-xs text-zinc-500 font-medium hidden sm:block">
                 Gold & Silver Diary Ledger
