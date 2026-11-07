@@ -402,67 +402,70 @@ export default function HomePage() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-10">
         {/* VIEW 1: HOME STARTING SCREEN */}
         {currentView === 'HOME' && (
-          <div className="space-y-10 sm:space-y-12">
+          <div className="space-y-8 sm:space-y-12">
             {/* Minimalist Hero */}
-            <div className="text-center max-w-3xl mx-auto space-y-3">
+            <div className="text-center max-w-3xl mx-auto space-y-2.5 sm:space-y-3 px-1">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-50 border border-purple-200/80 text-purple-700 text-xs font-semibold tracking-wide">
-                <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-                <span>Voice-First Lending Ledger & Diary Record</span>
+                <Sparkles className="w-3.5 h-3.5 text-purple-600 flex-shrink-0" />
+                <span className="truncate">Voice-First Lending Ledger & Diary Record</span>
               </div>
-              <h1 className="text-3xl sm:text-5xl font-bold text-zinc-900 tracking-tight">
+              <h1 className="text-2xl sm:text-4xl md:text-5xl font-extrabold text-zinc-900 tracking-tight">
                 Dahod Jewellery & Lending
               </h1>
-              <p className="text-sm sm:text-base text-zinc-600 leading-relaxed max-w-2xl mx-auto">
+              <p className="text-xs sm:text-base text-zinc-600 leading-relaxed max-w-2xl mx-auto">
                 Speak customer loan details with automated transcription to Excel, lookup physical diary pages, and calculate compound interest cleanly.
               </p>
             </div>
 
-            {/* PRIMARY OPTION CARDS */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-              {/* Card 1: Data Input (Voice to Excel) */}
+            {/* PRIMARY OPTION CARDS (Calculator shown FIRST as requested) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 max-w-5xl mx-auto">
+              {/* Option 1: Compound Interest Calculator (FIRST) */}
               <div
-                onClick={() => setCurrentView('BULK_INPUT')}
-                className="cursor-pointer group bg-white p-7 rounded-2xl border border-zinc-200 hover:border-purple-400 shadow-sm hover:shadow-card-hover transition-all duration-200 flex flex-col justify-between"
+                onClick={() => setCurrentView('CALCULATOR')}
+                className="cursor-pointer group bg-white p-5 sm:p-7 rounded-2xl border-2 border-purple-200 hover:border-purple-500 shadow-sm hover:shadow-card-hover transition-all duration-200 flex flex-col justify-between"
               >
                 <div>
-                  <div className="w-12 h-12 rounded-xl bg-purple-600 flex items-center justify-center text-white mb-5 shadow-sm group-hover:scale-105 transition-transform">
-                    <Mic className="w-6 h-6" />
+                  <div className="w-12 h-12 rounded-xl bg-purple-600 flex items-center justify-center text-white mb-4 sm:mb-5 shadow-sm group-hover:scale-105 transition-transform">
+                    <Calculator className="w-6 h-6 stroke-[2.2]" />
                   </div>
                   <div className="inline-block px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 text-[10px] font-bold uppercase tracking-wider mb-2 border border-purple-100">
-                    Continuous Speech
+                    Quick Tool • વર્ષ & મહિના
                   </div>
-                  <h2 className="text-xl font-bold text-zinc-900 group-hover:text-purple-700 transition-colors">
-                    Voice Data Input
+                  <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 group-hover:text-purple-700 transition-colors">
+                    Interest Calculator
                   </h2>
-                  <p className="text-xs sm:text-sm text-zinc-500 mt-2 font-normal leading-relaxed">
-                    Speak customer loan records continuously. Stream into an Excel spreadsheet with review cards and one-click database commit.
+                  <p className="text-xs sm:text-sm text-zinc-600 mt-2 font-normal leading-relaxed">
+                    Senior-friendly annual compounding calculator. Direct Years (વર્ષ) & Months (મહિના) selection with big high-contrast numbers.
                   </p>
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center justify-between text-purple-700 font-semibold text-xs sm:text-sm">
-                  <span>Start Voice Entry</span>
+                <div className="mt-5 sm:mt-6 pt-4 border-t border-zinc-100 flex items-center justify-between text-purple-700 font-bold text-xs sm:text-sm">
+                  <span>Open Calculator (ગણતરી કરો)</span>
                   <div className="w-7 h-7 rounded-full bg-purple-50 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors">
                     <ArrowRight className="w-4 h-4" />
                   </div>
                 </div>
               </div>
 
-              {/* Card 2: Customer Details */}
+              {/* Option 2: Customer Accounts (SECOND) */}
               <div
                 onClick={() => {
                   setSelectedCustomer(null);
                   setCurrentView('CUSTOMERS');
                 }}
-                className="cursor-pointer group bg-white p-7 rounded-2xl border border-zinc-200 hover:border-purple-400 shadow-sm hover:shadow-card-hover transition-all duration-200 flex flex-col justify-between"
+                className="cursor-pointer group bg-white p-5 sm:p-7 rounded-2xl border border-zinc-200 hover:border-purple-400 shadow-sm hover:shadow-card-hover transition-all duration-200 flex flex-col justify-between"
               >
                 <div>
-                  <div className="w-12 h-12 rounded-xl bg-zinc-100 group-hover:bg-purple-50 flex items-center justify-center text-zinc-700 group-hover:text-purple-700 mb-5 transition-all">
+                  <div className="w-12 h-12 rounded-xl bg-zinc-100 group-hover:bg-purple-50 flex items-center justify-center text-zinc-700 group-hover:text-purple-700 mb-4 sm:mb-5 transition-all">
                     <Users className="w-6 h-6" />
                   </div>
-                  <h2 className="text-xl font-bold text-zinc-900 group-hover:text-purple-700 transition-colors">
+                  <div className="inline-block px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-700 text-[10px] font-bold uppercase tracking-wider mb-2 border border-zinc-200">
+                    Ledger & Vault
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 group-hover:text-purple-700 transition-colors">
                     Customer Accounts
                   </h2>
                   <p className="text-xs sm:text-sm text-zinc-500 mt-2 font-normal leading-relaxed">
@@ -470,7 +473,7 @@ export default function HomePage() {
                   </p>
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center justify-between text-zinc-700 group-hover:text-purple-700 font-semibold text-xs sm:text-sm">
+                <div className="mt-5 sm:mt-6 pt-4 border-t border-zinc-100 flex items-center justify-between text-zinc-700 group-hover:text-purple-700 font-semibold text-xs sm:text-sm">
                   <span>View Accounts ({data.customers.length})</span>
                   <div className="w-7 h-7 rounded-full bg-zinc-100 group-hover:bg-purple-600 group-hover:text-white flex items-center justify-center transition-colors">
                     <ArrowRight className="w-4 h-4" />
@@ -478,25 +481,28 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Card 3: Compound Interest Calculator */}
+              {/* Option 3: Voice Data Input (THIRD) */}
               <div
-                onClick={() => setCurrentView('CALCULATOR')}
-                className="cursor-pointer group bg-white p-7 rounded-2xl border border-zinc-200 hover:border-purple-400 shadow-sm hover:shadow-card-hover transition-all duration-200 flex flex-col justify-between"
+                onClick={() => setCurrentView('BULK_INPUT')}
+                className="cursor-pointer group bg-white p-5 sm:p-7 rounded-2xl border border-zinc-200 hover:border-purple-400 shadow-sm hover:shadow-card-hover transition-all duration-200 flex flex-col justify-between"
               >
                 <div>
-                  <div className="w-12 h-12 rounded-xl bg-zinc-100 group-hover:bg-purple-50 flex items-center justify-center text-zinc-700 group-hover:text-purple-700 mb-5 transition-all">
-                    <Calculator className="w-6 h-6" />
+                  <div className="w-12 h-12 rounded-xl bg-zinc-100 group-hover:bg-purple-50 flex items-center justify-center text-zinc-700 group-hover:text-purple-700 mb-4 sm:mb-5 shadow-sm group-hover:scale-105 transition-all">
+                    <Mic className="w-6 h-6" />
                   </div>
-                  <h2 className="text-xl font-bold text-zinc-900 group-hover:text-purple-700 transition-colors">
-                    Interest Calculator
+                  <div className="inline-block px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 text-[10px] font-bold uppercase tracking-wider mb-2 border border-purple-100">
+                    Continuous Speech
+                  </div>
+                  <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 group-hover:text-purple-700 transition-colors">
+                    Voice Data Input
                   </h2>
                   <p className="text-xs sm:text-sm text-zinc-500 mt-2 font-normal leading-relaxed">
-                    Clean annual compounding utility. Defaults to a single item with flexible multi-item support and customizable interest rates.
+                    Speak customer loan records continuously. Stream into an Excel spreadsheet with review cards and one-click database commit.
                   </p>
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-zinc-100 flex items-center justify-between text-zinc-700 group-hover:text-purple-700 font-semibold text-xs sm:text-sm">
-                  <span>Open Calculator</span>
+                <div className="mt-5 sm:mt-6 pt-4 border-t border-zinc-100 flex items-center justify-between text-zinc-700 group-hover:text-purple-700 font-semibold text-xs sm:text-sm">
+                  <span>Start Voice Entry</span>
                   <div className="w-7 h-7 rounded-full bg-zinc-100 group-hover:bg-purple-600 group-hover:text-white flex items-center justify-center transition-colors">
                     <ArrowRight className="w-4 h-4" />
                   </div>
@@ -505,7 +511,7 @@ export default function HomePage() {
             </div>
 
             {/* Clean Scandinavian Stats Bar */}
-            <div className="max-w-5xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-2">
+            <div className="max-w-5xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4 pt-1 sm:pt-2">
               <div className="bg-white p-4 rounded-xl border border-zinc-200 text-center shadow-sm">
                 <span className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider block">
                   Customers

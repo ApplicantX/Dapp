@@ -101,9 +101,11 @@ export interface ParsedLoanVoice {
 
 export interface CalculatorItem {
   id: string;
-  principal: number;
-  startDate: string;
-  endDate: string;
+  principal: number | '';
+  years: number | '';
+  months: number | '';
+  startDate?: string;
+  endDate?: string;
   annualRate: number;
   yearsElapsed: number;
   interestAmount: number;
