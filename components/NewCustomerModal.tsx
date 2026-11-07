@@ -484,7 +484,7 @@ export const NewCustomerModal: React.FC<NewCustomerModalProps> = ({
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-medium text-zinc-700">
-                  Village (ગામ) <span className="text-rose-500">*</span>
+                  Village <span className="text-rose-500">*</span>
                 </label>
                 <button
                   type="button"

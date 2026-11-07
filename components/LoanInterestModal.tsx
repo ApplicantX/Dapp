@@ -283,7 +283,7 @@ Final Settlement Amount (P + I): ₹${calculation.finalSettlementAmount.toLocale
             </div>
             <div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-100 text-purple-900 text-xs sm:text-sm font-black uppercase tracking-wider mb-1">
-                <span>Annual Compounding (ચક્રવૃદ્ધિ વ્યાજ)</span>
+                <span>Annual Compounding</span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-black text-zinc-900 leading-tight">
                 {customerName} • <span className="text-zinc-600 font-bold text-lg sm:text-xl">{village}</span>
@@ -331,7 +331,7 @@ Final Settlement Amount (P + I): ₹${calculation.finalSettlementAmount.toLocale
             <div className="space-y-1.5">
               <label className="text-sm sm:text-base font-extrabold text-purple-950 flex items-center gap-1.5">
                 <Calendar className="w-4 h-4 text-purple-700 stroke-[2.5]" />
-                <span>Calculate As-Of Date (તારીખ)</span>
+                <span>Calculate As-Of Date</span>
               </label>
               <input
                 type="date"
@@ -491,7 +491,7 @@ Final Settlement Amount (P + I): ₹${calculation.finalSettlementAmount.toLocale
           <div className="bg-gradient-to-br from-purple-700 to-purple-900 p-6 sm:p-7 rounded-3xl text-white shadow-lg space-y-4">
             <div className="flex items-center justify-between border-b border-purple-400/50 pb-3">
               <span className="text-sm sm:text-base font-black uppercase tracking-wider text-purple-100">
-                Final Settlement Calculation (ખાતું પૂરું કરવા માટે)
+                Final Settlement Calculation
               </span>
               <button
                 onClick={handleCopySummary}
@@ -554,7 +554,7 @@ Final Settlement Amount (P + I): ₹${calculation.finalSettlementAmount.toLocale
             onClick={onClose}
             className="px-8 py-3 rounded-2xl bg-zinc-900 hover:bg-black text-white font-extrabold text-sm sm:text-base transition-colors shadow-2xs"
           >
-            Close (બંધ કરો)
+            Close
           </button>
         </div>
       </div>

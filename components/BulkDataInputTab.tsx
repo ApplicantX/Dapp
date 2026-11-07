@@ -730,7 +730,7 @@ export const BulkDataInputTab: React.FC<BulkDataInputTabProps> = ({
                 <tr>
                   <th className="py-2.5 px-3 w-10 text-center">#</th>
                   <th className="py-2.5 px-3 min-w-[140px]">Customer Name</th>
-                  <th className="py-2.5 px-3 min-w-[110px]">Village (ગામ)</th>
+                  <th className="py-2.5 px-3 min-w-[110px]">Village</th>
                   <th className="py-2.5 px-3 min-w-[100px]">Diary</th>
                   <th className="py-2.5 px-3 min-w-[70px] text-center">Page #</th>
                   <th className="py-2.5 px-3 min-w-[100px]">Loan (₹)</th>

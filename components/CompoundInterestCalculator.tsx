@@ -181,7 +181,7 @@ export const CompoundInterestCalculator: React.FC<CompoundInterestCalculatorProp
               </h1>
             </div>
             <p className="text-xs sm:text-base text-zinc-600 font-semibold mt-1">
-              Annual Compounding Loan Calculator (ચક્રવૃદ્ધિ વ્યાજ ગણતરી)
+              Annual Compounding Loan Calculator
             </p>
           </div>
         </div>
@@ -274,7 +274,7 @@ export const CompoundInterestCalculator: React.FC<CompoundInterestCalculatorProp
                 {/* Principal Amount (Large Field) */}
                 <div className="sm:col-span-6 space-y-1.5 p-3 sm:p-4 rounded-2xl bg-zinc-50 border-2 border-zinc-200">
                   <label className="text-xs sm:text-base font-extrabold text-zinc-900 block">
-                    Principal Amount (મુદ્દલ) *
+                    Principal Amount *
                   </label>
                   <div className="relative">
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 font-black text-lg sm:text-xl">
@@ -295,7 +295,7 @@ export const CompoundInterestCalculator: React.FC<CompoundInterestCalculatorProp
                 {/* Years Selector / Input */}
                 <div className="sm:col-span-3 space-y-1.5 p-3 sm:p-4 rounded-2xl bg-purple-50/50 border-2 border-purple-200">
                   <label className="text-xs sm:text-base font-extrabold text-purple-950 block">
-                    Years (વર્ષ)
+                    Years
                   </label>
                   <div className="flex items-center gap-1.5">
                     <input
@@ -336,7 +336,7 @@ export const CompoundInterestCalculator: React.FC<CompoundInterestCalculatorProp
                 {/* Months Selector / Input */}
                 <div className="sm:col-span-3 space-y-1.5 p-3 sm:p-4 rounded-2xl bg-purple-50/50 border-2 border-purple-200">
                   <label className="text-xs sm:text-base font-extrabold text-purple-950 block">
-                    Months (મહિના)
+                    Months
                   </label>
                   <div className="flex items-center gap-1.5">
                     <input
@@ -413,7 +413,7 @@ export const CompoundInterestCalculator: React.FC<CompoundInterestCalculatorProp
                 {/* Accrued Interest */}
                 <div className="p-4 sm:p-5 rounded-2xl bg-purple-50 border-2 border-purple-200 shadow-2xs flex flex-col justify-center">
                   <span className="text-xs sm:text-sm font-extrabold text-purple-800 uppercase tracking-wider block">
-                    Accrued Interest (ચક્રવૃદ્ધિ વ્યાજ)
+                    Accrued Interest
                   </span>
                   <span className="text-2xl sm:text-4xl font-black text-purple-900 mt-1 sm:mt-1.5 block tracking-tight">
                     ₹{item.interestAmount.toLocaleString('en-IN')}
@@ -423,7 +423,7 @@ export const CompoundInterestCalculator: React.FC<CompoundInterestCalculatorProp
                 {/* Total Repayable */}
                 <div className="p-4 sm:p-5 rounded-2xl bg-purple-100/80 border-2 border-purple-300 shadow-2xs flex flex-col justify-center">
                   <span className="text-xs sm:text-sm font-black text-purple-950 uppercase tracking-wider block">
-                    Total Repayable (કુલ મુદ્દલ + વ્યાજ)
+                    Total Repayable
                   </span>
                   <span className="text-2xl sm:text-4xl font-black text-purple-950 mt-1 sm:mt-1.5 block tracking-tight">
                     ₹{item.totalAmount.toLocaleString('en-IN')}
@@ -441,7 +441,7 @@ export const CompoundInterestCalculator: React.FC<CompoundInterestCalculatorProp
             className="w-full py-4 sm:py-5 rounded-3xl border-3 border-dashed border-purple-300 hover:border-purple-600 bg-white hover:bg-purple-50/50 active:scale-[0.99] text-base sm:text-lg font-black text-purple-800 hover:text-purple-900 flex items-center justify-center gap-2.5 transition-all shadow-sm"
           >
             <Plus className="w-5 h-5 sm:w-6 sm:h-6 stroke-[3]" />
-            <span>+ Add Another Item (બીજો દાગીનો ઉમેરો)</span>
+            <span>+ Add Another Item</span>
           </button>
         )}
       </div>
@@ -449,14 +449,14 @@ export const CompoundInterestCalculator: React.FC<CompoundInterestCalculatorProp
       {/* 3. Grand Totals Summary Card: Massive Senior-Citizen Numbers */}
       <div className="bg-white p-5 sm:p-8 rounded-3xl border-2 border-zinc-200 shadow-md space-y-4">
         <h3 className="text-sm sm:text-lg font-extrabold text-zinc-900 uppercase tracking-wide flex items-center gap-2">
-          <span>Grand Settlement Summary (કુલ સરવાળો)</span>
+          <span>Grand Settlement Summary</span>
         </h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-5">
           {/* Total Principal */}
           <div className="bg-zinc-50 p-4 sm:p-6 rounded-2xl border-2 border-zinc-200">
             <span className="text-xs sm:text-sm text-zinc-600 font-extrabold uppercase tracking-wider block">
-              Total Principal (કુલ મુદ્દલ)
+              Total Principal
             </span>
             <span className="text-2xl sm:text-4xl font-black text-zinc-950 mt-1 sm:mt-2 block tracking-tight">
               ₹{grandTotalPrincipal.toLocaleString('en-IN')}
@@ -466,7 +466,7 @@ export const CompoundInterestCalculator: React.FC<CompoundInterestCalculatorProp
           {/* Total Interest */}
           <div className="bg-purple-50 p-4 sm:p-6 rounded-2xl border-2 border-purple-200">
             <span className="text-xs sm:text-sm text-purple-800 font-extrabold uppercase tracking-wider block">
-              Total Interest (કુલ વ્યાજ)
+              Total Interest
             </span>
             <span className="text-2xl sm:text-4xl font-black text-purple-900 mt-1 sm:mt-2 block tracking-tight">
               ₹{grandTotalInterest.toLocaleString('en-IN')}
@@ -476,7 +476,7 @@ export const CompoundInterestCalculator: React.FC<CompoundInterestCalculatorProp
           {/* Grand Total */}
           <div className="bg-gradient-to-br from-purple-700 to-purple-900 p-4 sm:p-6 rounded-2xl text-white shadow-md">
             <span className="text-xs sm:text-sm text-purple-200 font-black uppercase tracking-wider block">
-              Grand Total (કુલ પતાવટ રકમ)
+              Grand Total
             </span>
             <span className="text-2xl sm:text-5xl font-black text-white mt-1 sm:mt-2 block tracking-tight">
               ₹{grandTotalAmount.toLocaleString('en-IN')}

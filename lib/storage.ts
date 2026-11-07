@@ -487,7 +487,7 @@ export function deletePaymentFromLoan(
   return updatedData;
 }
 
-// Add a Top-Up / Additional Loan on the same jewelry collateral (વધારાનો ઉપાડ)
+// Add a Top-Up / Additional Loan on the same jewelry collateral 
 export function addTopUpToLoan(
   data: AppData,
   loanId: string,
@@ -660,7 +660,7 @@ export function exportBulkRecordsToExcel(records: BulkCustomerLoanRecord[]): voi
   const rows = records.map((r, index) => ({
     '#': index + 1,
     'Customer Name': r.name,
-    'Village (ગામ)': r.village,
+    'Village': r.village,
     'Diary Reference': r.diary,
     'Page Number': r.pageNumber,
     'Mobile Number': r.mobile || '',

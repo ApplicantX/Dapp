@@ -15,8 +15,8 @@ export interface LoanPayment {
   id: string;
   date: string; // YYYY-MM-DD
   amount: number; // Total amount paid in INR
-  interestAmount?: number; // Interest portion considered (વ્યાજ પેટે)
-  principalAmount?: number; // Principal reduction portion (મુદ્દલ પેટે)
+  interestAmount?: number; // Interest portion considered 
+  principalAmount?: number; // Principal reduction portion 
   notes?: string;
   createdAt: string;
 }
@@ -24,7 +24,7 @@ export interface LoanPayment {
 export interface LoanTopUp {
   id: string;
   date: string; // YYYY-MM-DD
-  amount: number; // Additional loan amount in INR (વધારાનો ઉપાડ)
+  amount: number; // Additional loan amount in INR 
   notes?: string;
   createdAt: string;
 }
@@ -37,7 +37,7 @@ export interface Loan {
   status: LoanStatus;
   ornaments: Ornament[];
   payments?: LoanPayment[]; // Partial repayments made by customer
-  topUps?: LoanTopUp[]; // Additional loan amounts taken on same jewelry (વધારાનો ઉપાડ)
+  topUps?: LoanTopUp[]; // Additional loan amounts taken on same jewelry 
   closedDate?: string;
   notes?: string;
   createdAt: string;

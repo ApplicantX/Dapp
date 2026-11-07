@@ -82,7 +82,7 @@ export const EditDiaryPageModal: React.FC<EditDiaryPageModalProps> = ({
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-purple-700">New Page Number (પાના નંબર)</label>
+            <label className="text-xs font-semibold text-purple-700">New Page Number</label>
             <input
               type="text"
               required

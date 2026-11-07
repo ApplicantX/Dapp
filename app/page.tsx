@@ -362,7 +362,7 @@ export default function HomePage() {
         <div className="p-8 sm:p-10 bg-white rounded-3xl border-2 border-purple-200 shadow-md flex items-center gap-4 text-center">
           <div className="w-8 h-8 rounded-full border-4 border-purple-200 border-t-purple-600 animate-spin flex-shrink-0" />
           <span className="text-lg font-bold text-zinc-800">
-            Connecting to Live Supabase Database... (ડેટાબેઝ લોડ થઈ રહ્યો છે)
+            Connecting to Live Supabase Database...
           </span>
         </div>
       </div>
@@ -380,7 +380,7 @@ export default function HomePage() {
             onClick={() => window.location.reload()}
             className="px-6 py-2.5 rounded-full bg-rose-600 text-white font-bold text-xs"
           >
-            Retry Connection (ફરીથી પ્રયાસ કરો)
+            Retry Connection
           </button>
         </div>
       </div>
@@ -432,18 +432,18 @@ export default function HomePage() {
                     <Calculator className="w-6 h-6 stroke-[2.2]" />
                   </div>
                   <div className="inline-block px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 text-[10px] font-bold uppercase tracking-wider mb-2 border border-purple-100">
-                    Quick Tool • વર્ષ & મહિના
+                    Quick Tool • Years & Months
                   </div>
                   <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 group-hover:text-purple-700 transition-colors">
                     Interest Calculator
                   </h2>
                   <p className="text-xs sm:text-sm text-zinc-600 mt-2 font-normal leading-relaxed">
-                    Senior-friendly annual compounding calculator. Direct Years (વર્ષ) & Months (મહિના) selection with big high-contrast numbers.
+                    Senior-friendly annual compounding calculator. Direct Years & Months selection with big high-contrast numbers.
                   </p>
                 </div>
 
                 <div className="mt-5 sm:mt-6 pt-4 border-t border-zinc-100 flex items-center justify-between text-purple-700 font-bold text-xs sm:text-sm">
-                  <span>Open Calculator (ગણતરી કરો)</span>
+                  <span>Open Calculator</span>
                   <div className="w-7 h-7 rounded-full bg-purple-50 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors">
                     <ArrowRight className="w-4 h-4" />
                   </div>

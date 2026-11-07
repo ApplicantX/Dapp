@@ -413,8 +413,8 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
                         onChange={(e) => updateOrnament(idx, { metal: e.target.value as MetalType })}
                         className="w-full px-2 py-1.5 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-800 font-medium text-xs focus:bg-white focus:border-purple-500"
                       >
-                        <option value="Gold">🪙 Gold (સોનું / सोना)</option>
-                        <option value="Silver">🥈 Silver (ચાંદી / चांदी)</option>
+                        <option value="Gold">🪙 Gold</option>
+                        <option value="Silver">🥈 Silver</option>
                       </select>
                     </div>
 

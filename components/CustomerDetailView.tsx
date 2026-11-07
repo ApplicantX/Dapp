@@ -121,7 +121,7 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
             title="Go back to Customer List"
           >
             <ArrowLeft className="w-5 h-5 stroke-[2.5]" />
-            <span className="hidden sm:inline">Back (પાછા)</span>
+            <span className="hidden sm:inline">Back</span>
           </button>
 
           <div>
@@ -152,7 +152,7 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
             </div>
             <div>
               <span className="text-xs font-bold text-purple-800 uppercase tracking-wider block">
-                Physical Diary (ચોપડો)
+                Physical Diary
               </span>
               <div className="text-lg sm:text-xl font-black text-purple-950">
                 {customer.diary} • <span className="underline decoration-purple-400">Page {customer.pageNumber}</span>
@@ -176,7 +176,7 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 pb-3">
           <div className="flex items-center gap-2.5 text-zinc-900 font-extrabold text-base sm:text-lg">
             <Gem className="w-5 h-5 text-purple-600" />
-            <span>Active Ornaments in Vault (તિજોરીમાં દાગીના)</span>
+            <span>Active Ornaments in Vault</span>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -239,7 +239,7 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
           className="flex items-center gap-3 px-8 sm:px-10 py-4 rounded-2xl bg-purple-600 hover:bg-purple-700 active:scale-[0.98] text-white font-extrabold text-base sm:text-lg shadow-md hover:shadow-lg transition-all"
         >
           <Mic className="w-5 h-5 stroke-[2.5]" />
-          <span>Speak New Loan (+ નવો લોન ઉમેરો)</span>
+          <span>Speak New Loan</span>
         </button>
       </div>
 
@@ -279,7 +279,7 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
                       {/* 1. Remaining Principal (Most Important!) */}
                       <div className="p-4 rounded-2xl bg-purple-100/70 border-2 border-purple-300 col-span-2 sm:col-span-1">
                         <span className="text-xs font-extrabold uppercase tracking-wider text-purple-900 block">
-                          Remaining (બાકી મુદ્દલ)
+                          Remaining Principal
                         </span>
                         <span className="text-2xl sm:text-3xl font-black text-purple-950 mt-1 block">
                           ₹{details.remainingPrincipal.toLocaleString('en-IN')}
@@ -289,7 +289,7 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
                       {/* 2. Initial Loan */}
                       <div className="p-4 rounded-2xl bg-white border-2 border-zinc-200">
                         <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 block">
-                          Initial Loan (શરૂઆત)
+                          Initial Loan
                         </span>
                         <span className="text-xl sm:text-2xl font-bold text-zinc-900 mt-1 block">
                           ₹{details.initialPrincipal.toLocaleString('en-IN')}
@@ -299,7 +299,7 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
                       {/* 3. Top-Ups (if any) */}
                       <div className="p-4 rounded-2xl bg-white border-2 border-zinc-200">
                         <span className="text-xs font-bold uppercase tracking-wider text-purple-700 block">
-                          Top-Ups (વધારાનો ઉપાડ)
+                          Top-Ups
                         </span>
                         <span className="text-xl sm:text-2xl font-bold text-purple-900 mt-1 block">
                           {details.totalTopUps > 0
@@ -311,7 +311,7 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
                       {/* 4. Total Repaid (if any) */}
                       <div className="p-4 rounded-2xl bg-white border-2 border-zinc-200">
                         <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 block">
-                          Repaid (કુલ જમા)
+                          Repaid
                         </span>
                         <span className="text-xl sm:text-2xl font-bold text-emerald-800 mt-1 block">
                           {details.totalRepaid > 0
@@ -330,7 +330,7 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
                             : 'bg-rose-100 text-rose-900 border-rose-300'
                         }`}
                       >
-                        {isActive ? 'ACTIVE (ચાલુ ખાતું)' : 'CLOSED (બંધ ખાતું)'}
+                        {isActive ? 'ACTIVE' : 'CLOSED'}
                       </span>
                       <span className="text-xs sm:text-sm font-semibold text-zinc-600">
                         Loan Date: <strong className="text-zinc-900">{loan.loanDate}</strong>
@@ -344,7 +344,7 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
                     <div className="p-4 rounded-2xl bg-zinc-100/80 border border-zinc-200 flex flex-wrap items-center justify-between gap-3 text-sm">
                       <div className="flex items-center gap-2">
                         <Gem className="w-4 h-4 text-purple-700" />
-                        <span className="font-bold text-zinc-700">Collateral (દાગીના):</span>
+                        <span className="font-bold text-zinc-700">Collateral:</span>
                         <span className="font-semibold text-zinc-900">
                           {loan.ornaments
                             .map((o) => `${o.quantity}x ${o.category} (${o.weight}g ${o.metal})`)
@@ -476,7 +476,6 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
                         >
                           <Calculator className="w-6 h-6 stroke-[2.2] group-hover:scale-110 transition-transform" />
                           <span className="font-extrabold text-base">Calculate Interest</span>
-                          <span className="text-xs text-purple-200 font-semibold">(ચક્રવૃદ્ધિ વ્યાજ ગણો)</span>
                         </button>
 
                         {/* 2. Top-Up Loan */}
@@ -487,7 +486,6 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
                           >
                             <ArrowUpRight className="w-6 h-6 text-purple-700 stroke-[2.5] group-hover:scale-110 transition-transform" />
                             <span className="font-extrabold text-base">+ Top-Up Loan</span>
-                            <span className="text-xs text-purple-700 font-semibold">(વધારાનો ઉપાડ આપો)</span>
                           </button>
                         )}
 
@@ -499,7 +497,6 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
                           >
                             <ArrowDownLeft className="w-6 h-6 text-emerald-700 stroke-[2.5] group-hover:scale-110 transition-transform" />
                             <span className="font-extrabold text-base">+ Record Payment</span>
-                            <span className="text-xs text-emerald-700 font-semibold">(જમા રકમ લો)</span>
                           </button>
                         )}
 
@@ -511,7 +508,6 @@ export const CustomerDetailView: React.FC<CustomerDetailViewProps> = ({
                           >
                             <XCircle className="w-6 h-6 text-rose-700 stroke-[2.2] group-hover:scale-110 transition-transform" />
                             <span className="font-extrabold text-base">Close Loan</span>
-                            <span className="text-xs text-rose-700 font-semibold">(ખાતું બંધ કરો)</span>
                           </button>
                         )}
                       </div>
